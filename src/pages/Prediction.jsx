@@ -1,28 +1,65 @@
 import React, { useState } from "react";
 import { User, Upload, FileJson, Brain, AlertCircle } from "lucide-react";
-import DateInput from "../components/DateInput";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
+import "../styles/datepicker-custom.css";
+import { ptBR } from "date-fns/locale";
+import {
+  tipoConvenioOptions,
+  unidadeAtendimentoOptions,
+  especialidadeOptions,
+  sexoOptions,
+} from "../constants/predictionOptions";
 
 const Prediction = () => {
   const [activeTab, setActiveTab] = useState("individual");
   const [riskResult, setRiskResult] = useState(null);
   const [formData, setFormData] = useState({
-    age: "",
-    gender: "Female",
-    hypertension: false,
-    diabetes: false,
-    alcoholism: false,
-    handicap: false,
-    smsReceived: true,
-    scheduledDay: "",
-    appointmentDay: "",
-    awaitingTime: "",
+    id: "",
+    Status: "Realizado",
+    Marcacao: null,
+    DataHoraConsulta: null,
+    Idade: "",
+    Sexo: "",
+    CidadePaciente: "",
+    BairroPaciente: "",
+    TipoConvenio: "",
+    idUnicoPaciente: "",
+    UnidadeAtendimento: "",
+    EnderecoUnidadeAtendimento: "",
+    CEPUnidadeAtendimento: "",
+    Especialidade: "",
   });
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
+
+    // Clear custom validity message when user starts typing
+    e.target.setCustomValidity("");
+
     setFormData((prev) => ({
       ...prev,
       [name]: type === "checkbox" ? checked : value,
+    }));
+  };
+
+  const handleInvalid = (e) => {
+    const field = e.target;
+    if (field.validity.valueMissing) {
+      field.setCustomValidity("Por favor, preencha este campo");
+    } else if (field.validity.typeMismatch) {
+      field.setCustomValidity("Por favor, insira um valor válido");
+    } else if (field.validity.rangeUnderflow || field.validity.rangeOverflow) {
+      field.setCustomValidity(
+        "Por favor, insira um valor dentro do intervalo permitido",
+      );
+    }
+  };
+
+  const handleDateChange = (name, date) => {
+    setFormData((prev) => ({
+      ...prev,
+      [name]: date,
     }));
   };
 
@@ -90,111 +127,224 @@ const Prediction = () => {
               <div className="lg:col-span-2">
                 <form onSubmit={handleCalculateRisk} className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Age */}
+                    {/* ID */}
+                    {/* <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        ID da Consulta
+                      </label>
+                      <input
+                        type="number"
+                        name="id"
+                        value={formData.id}
+                        onChange={handleInputChange}
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                        placeholder="Digite o ID (opcional)"
+                      />
+                    </div> */}
+
+                    {/* Status */}
+                    {/* <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        Status
+                      </label>
+                      <select
+                        name="Status"
+                        value={formData.Status}
+                        onChange={handleInputChange}
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                      >
+                        <option value="Realizado">Realizado</option>
+                        <option value="Falta">Falta</option>
+                      </select>
+                    </div> */}
+
+                    {/* Marcacao */}
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        Data do Agendamento
+                      </label>
+                      <DatePicker
+                        selected={formData.Marcacao}
+                        onChange={(date) => handleDateChange("Marcacao", date)}
+                        dateFormat="dd/MM/yyyy"
+                        locale={ptBR}
+                        placeholderText="dd/mm/aaaa"
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                        required
+                        onKeyDown={(e) => e.preventDefault()}
+                      />
+                    </div>
+
+                    {/* DataHoraConsulta */}
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        Data da Consulta
+                      </label>
+                      <DatePicker
+                        selected={formData.DataHoraConsulta}
+                        onChange={(date) =>
+                          handleDateChange("DataHoraConsulta", date)
+                        }
+                        dateFormat="dd/MM/yyyy"
+                        locale={ptBR}
+                        placeholderText="dd/mm/aaaa"
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                        required
+                        onKeyDown={(e) => e.preventDefault()}
+                      />
+                    </div>
+
+                    {/* Idade */}
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-2">
                         Idade
                       </label>
                       <input
                         type="number"
-                        name="age"
-                        value={formData.age}
+                        name="Idade"
+                        value={formData.Idade}
                         onChange={handleInputChange}
                         className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                         placeholder="Digite a idade"
+                        min="0"
+                        max="120"
                         required
                       />
                     </div>
 
-                    {/* Gender */}
+                    {/* Sexo */}
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-2">
                         Sexo
                       </label>
                       <select
-                        name="gender"
-                        value={formData.gender}
+                        name="Sexo"
+                        value={formData.Sexo}
                         onChange={handleInputChange}
+                        onInvalid={handleInvalid}
                         className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                        required
                       >
-                        <option value="Female">Feminino</option>
-                        <option value="Male">Masculino</option>
+                        <option value="">Selecione...</option>
+                        {sexoOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
                       </select>
                     </div>
 
-                    {/* Scheduled Day */}
+                    {/* CidadePaciente */}
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-2">
-                        Data do Agendamento
-                      </label>
-                      <DateInput
-                        name="scheduledDay"
-                        value={formData.scheduledDay}
-                        onChange={handleInputChange}
-                        placeholder="Selecione a data"
-                        required
-                      />
-                    </div>
-
-                    {/* Appointment Day */}
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">
-                        Data da Consulta
-                      </label>
-                      <DateInput
-                        name="appointmentDay"
-                        value={formData.appointmentDay}
-                        onChange={handleInputChange}
-                        placeholder="Selecione a data"
-                        required
-                      />
-                    </div>
-
-                    {/* Awaiting Time */}
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">
-                        Tempo de Espera (dias)
+                        Cidade do Paciente
                       </label>
                       <input
-                        type="number"
-                        name="awaitingTime"
-                        value={formData.awaitingTime}
+                        type="text"
+                        name="CidadePaciente"
+                        value={formData.CidadePaciente}
                         onChange={handleInputChange}
                         className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                        placeholder="Dias até a consulta"
+                        placeholder="Digite a cidade"
+                        required
                       />
                     </div>
-                  </div>
 
-                  {/* Checkboxes */}
-                  <div className="space-y-3">
-                    <p className="text-sm font-medium text-slate-700">
-                      Condições Médicas
-                    </p>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                      {[
-                        { name: "hypertension", label: "Hipertensão" },
-                        { name: "diabetes", label: "Diabetes" },
-                        { name: "alcoholism", label: "Alcoolismo" },
-                        { name: "handicap", label: "Deficiência" },
-                        { name: "smsReceived", label: "SMS Recebido" },
-                      ].map((field) => (
-                        <label
-                          key={field.name}
-                          className="flex items-center gap-2 cursor-pointer"
-                        >
-                          <input
-                            type="checkbox"
-                            name={field.name}
-                            checked={formData[field.name]}
-                            onChange={handleInputChange}
-                            className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-2 focus:ring-blue-500"
-                          />
-                          <span className="text-sm text-slate-700">
-                            {field.label}
-                          </span>
-                        </label>
-                      ))}
+                    {/* BairroPaciente */}
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        Bairro do Paciente
+                      </label>
+                      <input
+                        type="text"
+                        name="BairroPaciente"
+                        value={formData.BairroPaciente}
+                        onChange={handleInputChange}
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                        placeholder="Digite o bairro"
+                        required
+                      />
+                    </div>
+
+                    {/* TipoConvenio */}
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        Tipo de Convênio
+                      </label>
+                      <select
+                        name="TipoConvenio"
+                        value={formData.TipoConvenio}
+                        onChange={handleInputChange}
+                        onInvalid={handleInvalid}
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                        required
+                      >
+                        <option value="">Selecione...</option>
+                        {tipoConvenioOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* idUnicoPaciente
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        ID Único do Paciente
+                      </label>
+                      <input
+                        type="text"
+                        name="idUnicoPaciente"
+                        value={formData.idUnicoPaciente}
+                        onChange={handleInputChange}
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                        placeholder="Digite o ID do paciente (opcional)"
+                      />
+                    </div> */}
+
+                    {/* UnidadeAtendimento */}
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        Unidade de Atendimento
+                      </label>
+                      <select
+                        name="UnidadeAtendimento"
+                        value={formData.UnidadeAtendimento}
+                        onChange={handleInputChange}
+                        onInvalid={handleInvalid}
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                        required
+                      >
+                        <option value="">Selecione...</option>
+                        {unidadeAtendimentoOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Especialidade */}
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        Especialidade
+                      </label>
+                      <select
+                        name="Especialidade"
+                        value={formData.Especialidade}
+                        onChange={handleInputChange}
+                        onInvalid={handleInvalid}
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                        required
+                      >
+                        <option value="">Selecione...</option>
+                        {especialidadeOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   </div>
 
@@ -247,6 +397,24 @@ const Prediction = () => {
                         <p className="text-4xl font-bold text-slate-800">
                           {riskResult.risk}%
                         </p>
+                      </div>
+
+                      {/* Probabilities */}
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-slate-600">
+                            Prob. Presença:
+                          </span>
+                          <span className="font-semibold text-green-600">
+                            {(100 - riskResult.risk).toFixed(1)}%
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-600">Prob. Falta:</span>
+                          <span className="font-semibold text-red-600">
+                            {riskResult.risk}%
+                          </span>
+                        </div>
                       </div>
 
                       {/* Progress Bar */}
@@ -332,7 +500,7 @@ const Prediction = () => {
                 <textarea
                   rows="10"
                   className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all font-mono text-sm"
-                  placeholder={`[\n  {\n    "age": 45,\n    "gender": "F",\n    "hypertension": false,\n    ...\n  }\n]`}
+                  placeholder={`[\n  {\n    "id": 5642903,\n    "Status": "Realizado",\n    "Marcacao": "2024-11-16T08:00:00",\n    "DataHoraConsulta": "2024-11-23T14:00:00",\n    "Idade": 62,\n    "Sexo": "F",\n    "CidadePaciente": "SAO PAULO",\n    "BairroPaciente": "BELA VISTA",\n    "TipoConvenio": "Enfermaria",\n    "Especialidade": "CARDIOLOGIA"\n  }\n]`}
                 />
               </div>
 

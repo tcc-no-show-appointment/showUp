@@ -1,0 +1,30 @@
+/* Custom styles for React DatePicker */
+
+/* Fix vertical alignment of month/year text and arrows */
+.react-datepicker__current-month {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: normal;
+}
+
+.react-datepicker__header {
+  padding-top: 8px;
+}
+
+.react-datepicker__navigation {
+  top: 8px;
+}
+
+/* Change selected date text color to white */
+.react-datepicker__day--selected,
+.react-datepicker__day--keyboard-selected {
+  color: white !important;
+  background-color: #3b82f6 !important;
+}
+
+.react-datepicker__day--selected:hover,
+.react-datepicker__day--keyboard-selected:hover {
+  color: white !important;
+  background-color: #2563eb !important;
+}

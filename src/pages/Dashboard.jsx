@@ -1,5 +1,5 @@
 import React from "react";
-import { TrendingUp, Users, DollarSign } from "lucide-react";
+import { TrendingUp, Users, CalendarCheck } from "lucide-react";
 import {
   AreaChart,
   Area,
@@ -16,7 +16,7 @@ const Dashboard = () => {
   const kpiData = [
     {
       title: "Predições Hoje",
-      value: "247",
+      value: "38",
       icon: Users,
       change: "+12%",
       positive: true,
@@ -29,10 +29,10 @@ const Dashboard = () => {
       positive: true,
     },
     {
-      title: "Economia Estimada",
-      value: "R$ 12.450",
-      icon: DollarSign,
-      change: "+18%",
+      title: "Taxa de Comparecimento",
+      value: "76.6%",
+      icon: CalendarCheck,
+      change: "+5.2%",
       positive: true,
     },
   ];
@@ -83,7 +83,9 @@ const Dashboard = () => {
                     >
                       {kpi.change}
                     </span>
-                    <span className="text-xs text-slate-500">vs semana passada</span>
+                    <span className="text-xs text-slate-500">
+                      vs semana passada
+                    </span>
                   </div>
                 </div>
                 <div className="w-12 h-12 rounded-xl bg-brand-gradient flex items-center justify-center">
