@@ -64,36 +64,3 @@ declare module './pages/Appointments' {
   const Appointments: ComponentType<any>;
   export default Appointments;
 }
-
-// React DatePicker fix for React 18
-declare module 'react-datepicker' {
-  import { Component } from 'react';
-  import { Locale } from 'date-fns';
-
-  export interface ReactDatePickerProps {
-    selected?: Date | null;
-    onChange: (date: Date | null, event?: React.SyntheticEvent<any> | undefined) => void;
-    dateFormat?: string | string[];
-    locale?: string | Locale;
-    placeholderText?: string;
-    required?: boolean;
-    className?: string;
-    calendarClassName?: string;
-    showYearDropdown?: boolean;
-    showMonthDropdown?: boolean;
-    dropdownMode?: 'scroll' | 'select';
-    minDate?: Date | null;
-    maxDate?: Date | null;
-    disabled?: boolean;
-    readOnly?: boolean;
-    withPortal?: boolean;
-    inline?: boolean;
-    [key: string]: any;
-  }
-
-  export default class DatePicker extends Component<ReactDatePickerProps> {}
-  
-  export function registerLocale(localeName: string, localeData: Locale): void;
-  export function setDefaultLocale(localeName: string): void;
-  export function getDefaultLocale(): string;
-}
