@@ -1,5 +1,13 @@
 import React, { useState } from "react";
-import { User, Upload, FileJson, Brain, AlertCircle } from "lucide-react";
+import {
+  User,
+  Upload,
+  FileJson,
+  Brain,
+  AlertCircle,
+  Loader2,
+  MapPin,
+} from "lucide-react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import "../styles/datepicker-custom.css";
@@ -10,6 +18,7 @@ import {
   especialidadeOptions,
   sexoOptions,
 } from "../constants/predictionOptions";
+import { cepService, predictionService } from "../services";
 
 const Prediction = () => {
   const [activeTab, setActiveTab] = useState("individual");
@@ -21,6 +30,7 @@ const Prediction = () => {
     DataHoraConsulta: null,
     Idade: "",
     Sexo: "",
+    CEPPaciente: "",
     CidadePaciente: "",
     BairroPaciente: "",
     TipoConvenio: "",
@@ -30,6 +40,11 @@ const Prediction = () => {
     CEPUnidadeAtendimento: "",
     Especialidade: "",
   });
+  const [cepLoading, setCepLoading] = useState(false);
+  const [cepError, setCepError] = useState("");
+  const [cepAutoFilled, setCepAutoFilled] = useState(false);
+  const [predictionLoading, setPredictionLoading] = useState(false);
+  const [predictionError, setPredictionError] = useState("");
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -63,15 +78,145 @@ const Prediction = () => {
     }));
   };
 
-  const handleCalculateRisk = (e) => {
+  const handleCepChange = async (cep) => {
+    // Clear previous errors
+    setCepError("");
+
+    // Update CEP value
+    setFormData((prev) => ({
+      ...prev,
+      CEPPaciente: cep,
+    }));
+
+    // Remove formatting to check length
+    const cleanCep = cep.replace(/\D/g, "");
+
+    // Only fetch when we have exactly 8 digits
+    if (cleanCep.length === 8) {
+      setCepLoading(true);
+      try {
+        const addressData = await cepService.fetchAddressByCep(cleanCep);
+
+        // Auto-fill city and neighborhood
+        setFormData((prev) => ({
+          ...prev,
+          CidadePaciente: addressData.localidade.toUpperCase(),
+          BairroPaciente: addressData.bairro.toUpperCase(),
+        }));
+
+        setCepAutoFilled(true);
+      } catch (error) {
+        setCepError(error.message);
+        setCepAutoFilled(false);
+        // Clear auto-filled fields on error
+        setFormData((prev) => ({
+          ...prev,
+          CidadePaciente: "",
+          BairroPaciente: "",
+        }));
+      } finally {
+        setCepLoading(false);
+      }
+    } else {
+      // Reset auto-fill state if CEP is incomplete
+      setCepAutoFilled(false);
+      if (cleanCep.length === 0) {
+        setFormData((prev) => ({
+          ...prev,
+          CidadePaciente: "",
+          BairroPaciente: "",
+        }));
+      }
+    }
+  };
+
+  const handleCalculateRisk = async (e) => {
     e.preventDefault();
-    // Mock risk calculation
-    const mockRisk = Math.floor(Math.random() * 100);
-    setRiskResult({
-      risk: mockRisk,
-      level: mockRisk > 70 ? "High" : mockRisk > 40 ? "Medium" : "Low",
-      color: mockRisk > 70 ? "red" : mockRisk > 40 ? "yellow" : "green",
-    });
+    setPredictionLoading(true);
+    setPredictionError("");
+    setRiskResult(null);
+
+    try {
+      // Map unit name to address/CEP (simple mapping for common units)
+      const unitMapping = {
+        "CAMPO BELO": {
+          address: "RUA VIEIRA DE MORAES",
+          cep: "04617-015",
+        },
+        "SEDE (SÃO PAULO) - AMB. TRAS": {
+          address: "RUA ABILIO SOARES",
+          cep: "04005-000",
+        },
+        "SANTANA - AMB. TRAS": {
+          address: "RUA VOLUNTARIOS DA PATRIA",
+          cep: "02011-000",
+        },
+        "BELA VISTA - AMB. IGESP": {
+          address: "RUA SANTO ANTONIO",
+          cep: "01314-000",
+        },
+      };
+
+      const unitInfo = unitMapping[formData.UnidadeAtendimento] || {
+        address: "AVENIDA PAULISTA",
+        cep: "01310-100",
+      };
+
+      // Build request payload matching API schema
+      const requestData = {
+        Marcacao: formData.Marcacao?.toISOString() || new Date().toISOString(),
+        DataHoraConsulta:
+          formData.DataHoraConsulta?.toISOString() || new Date().toISOString(),
+        Idade: parseInt(formData.Idade, 10),
+        Sexo: formData.Sexo,
+        CidadePaciente: formData.CidadePaciente,
+        BairroPaciente: formData.BairroPaciente,
+        TipoConvenio: formData.TipoConvenio,
+        idUnicoPaciente: formData.idUnicoPaciente || `PATIENT${Date.now()}`,
+        UnidadeAtendimento: formData.UnidadeAtendimento,
+        EnderecoUnidadeAtendimento: unitInfo.address,
+        CEPUnidadeAtendimento: unitInfo.cep,
+        Especialidade: formData.Especialidade,
+      };
+
+      // Call prediction API
+      const result = await predictionService.predict(requestData);
+
+      // Transform API response to UI format
+      const probabilityNoShowPercent = Math.round(
+        result.probability_no_show * 100,
+      );
+      const probabilityShowPercent = Math.round(result.probability_show * 100);
+
+      setRiskResult({
+        risk: probabilityNoShowPercent,
+        level:
+          probabilityNoShowPercent > 70
+            ? "High"
+            : probabilityNoShowPercent > 40
+              ? "Medium"
+              : "Low",
+        color:
+          probabilityNoShowPercent > 70
+            ? "red"
+            : probabilityNoShowPercent > 40
+              ? "yellow"
+              : "green",
+        prediction: result.prediction,
+        predictionLabel: result.prediction_label,
+        probabilityShow: probabilityShowPercent,
+        probabilityNoShow: probabilityNoShowPercent,
+      });
+    } catch (error) {
+      console.error("Prediction error:", error);
+      setPredictionError(
+        error.response?.data?.detail ||
+          error.message ||
+          "Erro ao calcular predição. Tente novamente.",
+      );
+    } finally {
+      setPredictionLoading(false);
+    }
   };
 
   const handleBatchProcess = () => {
@@ -234,6 +379,39 @@ const Prediction = () => {
                       </select>
                     </div>
 
+                    {/* CEP Paciente */}
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        CEP do Paciente
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          name="CEPPaciente"
+                          value={formData.CEPPaciente}
+                          onChange={(e) => handleCepChange(e.target.value)}
+                          className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                          placeholder="12345-678"
+                          maxLength="9"
+                          required
+                        />
+                        {cepLoading && (
+                          <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-blue-500 animate-spin" />
+                        )}
+                        {cepAutoFilled && !cepLoading && (
+                          <MapPin className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-green-500" />
+                        )}
+                      </div>
+                      {cepError && (
+                        <p className="mt-1 text-xs text-red-600">{cepError}</p>
+                      )}
+                      {cepAutoFilled && !cepError && (
+                        <p className="mt-1 text-xs text-green-600">
+                          Endereço preenchido automaticamente
+                        </p>
+                      )}
+                    </div>
+
                     {/* CidadePaciente */}
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -244,9 +422,10 @@ const Prediction = () => {
                         name="CidadePaciente"
                         value={formData.CidadePaciente}
                         onChange={handleInputChange}
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                        placeholder="Digite a cidade"
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all disabled:bg-slate-100 disabled:text-slate-600 disabled:cursor-not-allowed"
+                        placeholder="Digite a cidade ou preencha o CEP"
                         required
+                        disabled={cepAutoFilled}
                       />
                     </div>
 
@@ -260,9 +439,10 @@ const Prediction = () => {
                         name="BairroPaciente"
                         value={formData.BairroPaciente}
                         onChange={handleInputChange}
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                        placeholder="Digite o bairro"
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all disabled:bg-slate-100 disabled:text-slate-600 disabled:cursor-not-allowed"
+                        placeholder="Digite o bairro ou preencha o CEP"
                         required
+                        disabled={cepAutoFilled}
                       />
                     </div>
 
@@ -348,13 +528,40 @@ const Prediction = () => {
                     </div>
                   </div>
 
+                  {/* Error Display */}
+                  {predictionError && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                      <div className="flex gap-3">
+                        <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-sm font-medium text-red-800 mb-1">
+                            Erro ao calcular predição
+                          </p>
+                          <p className="text-xs text-red-700">
+                            {predictionError}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Submit Button */}
                   <button
                     type="submit"
-                    className="w-full bg-brand-gradient text-white font-semibold py-3 px-6 rounded-xl hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2"
+                    disabled={predictionLoading}
+                    className="w-full bg-brand-gradient text-white font-semibold py-3 px-6 rounded-xl hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <Brain className="w-5 h-5" />
-                    Calcular Risco
+                    {predictionLoading ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        Calculando...
+                      </>
+                    ) : (
+                      <>
+                        <Brain className="w-5 h-5" />
+                        Calcular Risco
+                      </>
+                    )}
                   </button>
                 </form>
               </div>
@@ -429,6 +636,22 @@ const Prediction = () => {
                           }`}
                           style={{ width: `${riskResult.risk}%` }}
                         />
+                      </div>
+
+                      {/* Prediction Label */}
+                      <div className="text-center py-2">
+                        <p className="text-xs text-slate-500 mb-1">Predição</p>
+                        <p
+                          className={`text-lg font-bold ${
+                            riskResult.predictionLabel === "No-Show"
+                              ? "text-red-600"
+                              : "text-green-600"
+                          }`}
+                        >
+                          {riskResult.predictionLabel === "No-Show"
+                            ? "Falta"
+                            : "Presença"}
+                        </p>
                       </div>
 
                       <div className="pt-4 border-t border-slate-200">

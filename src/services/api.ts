@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios, { AxiosError } from "axios";
 
 // ---------------------------------------------------------------------------
 // Base URLs — change these when deploying to other environments
@@ -36,7 +36,7 @@ export const trainingApi = axios.create({
 // ---------------------------------------------------------------------------
 // Response interceptor — unwrap errors consistently
 // ---------------------------------------------------------------------------
-const errorInterceptor = (error) => {
+const errorInterceptor = (error: AxiosError<{ detail?: string; message?: string }>) => {
   if (error.response) {
     // Server responded with a status outside 2xx
     const message =

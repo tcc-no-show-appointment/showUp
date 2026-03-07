@@ -6,20 +6,24 @@
  *   POST /training/upload-and-train → upload file and trigger full training pipeline
  */
 import { trainingApi } from "./api";
+import type { ValidationResponse, TrainingResponse } from "../types/models";
 
 /**
  * Validate an uploaded data file without triggering training.
  *
- * @param   {File} file - The file to validate (CSV, Excel, or Parquet)
- * @returns {Promise<import('../types/models').ValidationResponse>}
+ * @param file - The file to validate (CSV, Excel, or Parquet)
  */
-export const validateFile = async (file) => {
+export const validateFile = async (file: File): Promise<ValidationResponse> => {
   const formData = new FormData();
   formData.append("file", file);
 
-  const response = await trainingApi.post("/training/validate", formData, {
-    headers: { "Content-Type": "multipart/form-data" },
-  });
+  const response = await trainingApi.post<ValidationResponse>(
+    "/training/validate",
+    formData,
+    {
+      headers: { "Content-Type": "multipart/form-data" },
+    }
+  );
   return response.data;
 };
 
@@ -27,19 +31,18 @@ export const validateFile = async (file) => {
  * Upload a data file and run the full training pipeline.
  * This is a long-running operation — the training API has a longer timeout.
  *
- * @param   {File} file - The file to upload and train on
- * @returns {Promise<import('../types/models').TrainingResponse>}
+ * @param file - The file to upload and train on
  */
-export const uploadAndTrain = async (file) => {
+export const uploadAndTrain = async (file: File): Promise<TrainingResponse> => {
   const formData = new FormData();
   formData.append("file", file);
 
-  const response = await trainingApi.post(
+  const response = await trainingApi.post<TrainingResponse>(
     "/training/upload-and-train",
     formData,
     {
       headers: { "Content-Type": "multipart/form-data" },
-    },
+    }
   );
   return response.data;
 };

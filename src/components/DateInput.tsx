@@ -1,5 +1,5 @@
 import React from 'react'
-import DatePicker, { registerLocale } from 'react-datepicker'
+import ReactDatePicker, { registerLocale } from 'react-datepicker'
 import { ptBR } from 'date-fns/locale'
 import 'react-datepicker/dist/react-datepicker.css'
 import { Calendar } from 'lucide-react'
@@ -7,11 +7,25 @@ import { Calendar } from 'lucide-react'
 // Register Portuguese locale
 registerLocale('pt-BR', ptBR)
 
-const DateInput = ({ value, onChange, placeholder, required, name }) => {
+interface DateInputProps {
+  value: string;
+  onChange: (event: { target: { name: string; value: string; type: string } }) => void;
+  placeholder?: string;
+  required?: boolean;
+  name: string;
+}
+
+const DateInput: React.FC<DateInputProps> = ({
+  value,
+  onChange,
+  placeholder,
+  required,
+  name,
+}) => {
   // Convert string value to Date object
   const dateValue = value ? new Date(value) : null
 
-  const handleChange = (date) => {
+  const handleChange = (date: Date | null) => {
     // Convert Date object to YYYY-MM-DD string format
     if (date) {
       const year = date.getFullYear()
@@ -40,7 +54,7 @@ const DateInput = ({ value, onChange, placeholder, required, name }) => {
 
   return (
     <div className="relative">
-      <DatePicker
+      <ReactDatePicker
         selected={dateValue}
         onChange={handleChange}
         dateFormat="dd/MM/yyyy"

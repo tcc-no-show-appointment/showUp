@@ -5,14 +5,13 @@
  *   GET /model-history/ → list all trained models with metrics
  */
 import { trainingApi } from "./api";
+import type { ModelHistoryResponse } from "../types/models";
 
 /**
  * Get every model registered in the database.
- *
- * @returns {Promise<import('../types/models').ModelHistoryResponse[]>}
  */
-export const getAllModels = async () => {
-  const response = await trainingApi.get("/model-history/");
+export const getAllModels = async (): Promise<ModelHistoryResponse[]> => {
+  const response = await trainingApi.get<ModelHistoryResponse[]>("/model-history/");
   return response.data;
 };
 

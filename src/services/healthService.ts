@@ -11,28 +11,37 @@
  *     GET /health/ → health check (returns HealthResponse)
  */
 import { predictionApi, trainingApi } from "./api";
+import type { HealthResponse } from "../types/models";
 
 // ---------------------------------------------------------------------------
 // Prediction API health
 // ---------------------------------------------------------------------------
 
+interface PredictionApiRootResponse {
+  status: string;
+  message: string;
+}
+
+interface PredictionApiHealthResponse {
+  status: string;
+  model_loaded: boolean;
+  config_loaded: boolean;
+  model_type: string | null;
+}
+
 /**
  * Root health check on the Prediction API.
- *
- * @returns {Promise<{ status: string, message: string }>}
  */
-export const getPredictionApiRoot = async () => {
-  const response = await predictionApi.get("/");
+export const getPredictionApiRoot = async (): Promise<PredictionApiRootResponse> => {
+  const response = await predictionApi.get<PredictionApiRootResponse>("/");
   return response.data;
 };
 
 /**
  * Detailed health check on the Prediction API (model & config status).
- *
- * @returns {Promise<{ status: string, model_loaded: boolean, config_loaded: boolean, model_type: string|null }>}
  */
-export const getPredictionApiHealth = async () => {
-  const response = await predictionApi.get("/health");
+export const getPredictionApiHealth = async (): Promise<PredictionApiHealthResponse> => {
+  const response = await predictionApi.get<PredictionApiHealthResponse>("/health");
   return response.data;
 };
 
@@ -42,21 +51,17 @@ export const getPredictionApiHealth = async () => {
 
 /**
  * Root health check on the Training API.
- *
- * @returns {Promise<import('../types/models').HealthResponse>}
  */
-export const getTrainingApiRoot = async () => {
-  const response = await trainingApi.get("/");
+export const getTrainingApiRoot = async (): Promise<HealthResponse> => {
+  const response = await trainingApi.get<HealthResponse>("/");
   return response.data;
 };
 
 /**
  * Health check on the Training API.
- *
- * @returns {Promise<import('../types/models').HealthResponse>}
  */
-export const getTrainingApiHealth = async () => {
-  const response = await trainingApi.get("/health/");
+export const getTrainingApiHealth = async (): Promise<HealthResponse> => {
+  const response = await trainingApi.get<HealthResponse>("/health/");
   return response.data;
 };
 

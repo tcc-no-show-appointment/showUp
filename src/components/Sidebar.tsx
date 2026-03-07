@@ -1,10 +1,15 @@
-import React from "react";
 import { NavLink } from "react-router-dom";
-import { LayoutDashboard, BrainCircuit, ListTodo } from "lucide-react";
+import { LayoutDashboard, BrainCircuit, ListTodo, LucideIcon } from "lucide-react";
 import { ShowUpLogo } from "../assets";
 
-const Sidebar = () => {
-  const navItems = [
+interface NavItem {
+  name: string;
+  path: string;
+  icon: LucideIcon;
+}
+
+const Sidebar: React.FC = () => {
+  const navItems: NavItem[] = [
     {
       name: "Painel",
       path: "/dashboard",
