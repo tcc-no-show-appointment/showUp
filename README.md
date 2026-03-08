@@ -7,11 +7,55 @@ A modern, responsive SaaS frontend built with React, Tailwind CSS, and Recharts 
 - **Dashboard**: Overview with KPI cards and weekly attendance trend chart
 - **Prediction**: Individual and batch prediction capabilities
   - Individual: Form-based prediction with real-time risk calculation
-  - Batch: CSV/Excel upload or JSON input for bulk processing
+  - Batch: CSV upload or JSON input for bulk processing (up to 1,000 appointments)
 - **Appointments**: Interactive table for managing daily appointments with feedback loop
   - Color-coded risk levels (High/Medium/Low)
   - Batch selection with floating action bar
   - Mark appointments as Show or No-Show
+
+## Batch Prediction Usage
+
+The batch prediction feature allows you to predict no-show risk for multiple appointments at once.
+
+### Input Methods
+
+#### 1. CSV File Upload
+
+Upload a CSV file with the following columns:
+
+- `Marcacao` (ISO datetime): Scheduled date/time
+- `DataHoraConsulta` (ISO datetime): Appointment date/time
+- `Idade` (integer): Patient age (0-120)
+- `Sexo` (string): Patient gender ("M" or "F")
+- `CidadePaciente` (string): Patient city
+- `BairroPaciente` (string): Patient neighborhood
+- `TipoConvenio` (string): Insurance type
+- `UnidadeAtendimento` (string): Healthcare unit name
+- `Especialidade` (string): Medical specialty
+- `idUnicoPaciente` (string, optional): Unique patient ID
+
+Example files provided:
+
+- `example_batch_prediction.csv`
+- `example_batch_prediction.json`
+
+#### 2. JSON Input
+
+Paste JSON array directly in the textarea. Each object must contain the same fields as CSV.
+
+### Results
+
+After processing, you'll see:
+
+- **Summary cards**: Total appointments, predicted shows, predicted no-shows
+- **Results table**: Detailed predictions for each appointment
+- **Download option**: Export results as CSV file
+
+### Limits
+
+- Maximum 1,000 appointments per batch
+- All required fields must be present
+- Invalid records will prevent processing with clear error messages
 
 ## Tech Stack
 
