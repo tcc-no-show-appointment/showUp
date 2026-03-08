@@ -11,6 +11,8 @@ import {
   CheckCircle,
   XCircle,
   TrendingUp,
+  Save,
+  X,
 } from "lucide-react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
@@ -22,7 +24,7 @@ import {
   especialidadeOptions,
   sexoOptions,
 } from "../constants/predictionOptions";
-import { cepService, predictionService } from "../services";
+import { cepService, predictionService, appointmentService } from "../services";
 
 const Prediction = () => {
   const [activeTab, setActiveTab] = useState("individual");
@@ -56,6 +58,15 @@ const Prediction = () => {
   const [batchLoading, setBatchLoading] = useState(false);
   const [batchError, setBatchError] = useState("");
   const [batchResults, setBatchResults] = useState(null);
+
+  // Save modal states
+  const [saveModal, setSaveModal] = useState({
+    open: false,
+    data: null,
+    saving: false,
+    savedId: null,
+    error: "",
+  });
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -463,6 +474,102 @@ const Prediction = () => {
     } finally {
       setPredictionLoading(false);
     }
+  };
+
+  const openSaveModal = (appointmentPayload) => {
+    setSaveModal({
+      open: true,
+      data: appointmentPayload,
+      saving: false,
+      savedId: null,
+      error: "",
+    });
+  };
+
+  const closeSaveModal = () => {
+    setSaveModal({
+      open: false,
+      data: null,
+      saving: false,
+      savedId: null,
+      error: "",
+    });
+  };
+
+  const handleConfirmSave = async () => {
+    setSaveModal((prev) => ({ ...prev, saving: true, error: "" }));
+    try {
+      const created = await appointmentService.createAppointment(
+        saveModal.data,
+      );
+      setSaveModal((prev) => ({
+        ...prev,
+        saving: false,
+        savedId: created.appointment_prediction_id,
+      }));
+    } catch (error) {
+      setSaveModal((prev) => ({
+        ...prev,
+        saving: false,
+        error:
+          error.response?.data?.detail ||
+          error.message ||
+          "Erro ao salvar consulta.",
+      }));
+    }
+  };
+
+  const buildIndividualPayload = () => {
+    const unitInfo = unitMapping[formData.UnidadeAtendimento] || {
+      address: "AVENIDA PAULISTA",
+      cep: "01310-100",
+    };
+    return {
+      patient_id: formData.idUnicoPaciente || null,
+      scheduled_at: formData.Marcacao?.toISOString() || null,
+      appointment_at: formData.DataHoraConsulta?.toISOString() || null,
+      patient_age: parseInt(formData.Idade, 10) || null,
+      patient_sex: formData.Sexo || null,
+      patient_city: formData.CidadePaciente || null,
+      patient_neighborhood: formData.BairroPaciente || null,
+      insurance_type: formData.TipoConvenio || null,
+      unit_name: formData.UnidadeAtendimento || null,
+      unit_address: unitInfo.address,
+      unit_zipcode: unitInfo.cep,
+      specialty: formData.Especialidade || null,
+      prediction_class: riskResult?.prediction ?? null,
+      prediction_label: riskResult?.predictionLabel ?? null,
+      probability_show: riskResult ? riskResult.probabilityShow / 100 : null,
+      probability_no_show: riskResult
+        ? riskResult.probabilityNoShow / 100
+        : null,
+    };
+  };
+
+  const buildBatchItemPayload = (result) => {
+    const appt = result.appointment;
+    const unitInfo = unitMapping[appt.UnidadeAtendimento] || {
+      address: "AVENIDA PAULISTA",
+      cep: "01310-100",
+    };
+    return {
+      patient_id: appt.idUnicoPaciente || null,
+      scheduled_at: appt.Marcacao || null,
+      appointment_at: appt.DataHoraConsulta || null,
+      patient_age: parseInt(appt.Idade, 10) || null,
+      patient_sex: appt.Sexo || null,
+      patient_city: appt.CidadePaciente || null,
+      patient_neighborhood: appt.BairroPaciente || null,
+      insurance_type: appt.TipoConvenio || null,
+      unit_name: appt.UnidadeAtendimento || null,
+      unit_address: unitInfo.address,
+      unit_zipcode: unitInfo.cep,
+      specialty: appt.Especialidade || null,
+      prediction_class: result.prediction,
+      prediction_label: result.prediction_label,
+      probability_show: result.probability_show,
+      probability_no_show: result.probability_no_show,
+    };
   };
 
   return (
@@ -895,10 +1002,19 @@ const Prediction = () => {
                       </div>
 
                       <div className="pt-4 border-t border-slate-200">
-                        <p className="text-xs text-slate-500">
+                        <p className="text-xs text-slate-500 mb-3">
                           Esta predição é baseada em análise de IA dos dados do
                           paciente e padrões históricos.
                         </p>
+                        <button
+                          onClick={() =>
+                            openSaveModal(buildIndividualPayload())
+                          }
+                          className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                        >
+                          <Save className="w-4 h-4" />
+                          Salvar Consulta
+                        </button>
                       </div>
                     </div>
                   ) : (
@@ -1150,6 +1266,9 @@ const Prediction = () => {
                             <th className="px-4 py-3 text-right font-semibold text-slate-700">
                               Prob. Falta
                             </th>
+                            <th className="px-4 py-3 text-center font-semibold text-slate-700">
+                              Ação
+                            </th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -1196,6 +1315,17 @@ const Prediction = () => {
                               <td className="px-4 py-3 text-right font-semibold text-slate-700">
                                 {(result.probability_no_show * 100).toFixed(1)}%
                               </td>
+                              <td className="px-4 py-3 text-center">
+                                <button
+                                  onClick={() =>
+                                    openSaveModal(buildBatchItemPayload(result))
+                                  }
+                                  className="inline-flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-semibold bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors"
+                                >
+                                  <Save className="w-3 h-3" />
+                                  Salvar
+                                </button>
+                              </td>
                             </tr>
                           ))}
                         </tbody>
@@ -1208,6 +1338,175 @@ const Prediction = () => {
           </div>
         )}
       </div>
+
+      {/* Save Confirmation Modal */}
+      {saveModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 border-b border-slate-200">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+                  <Save className="w-5 h-5 text-blue-600" />
+                </div>
+                <h2 className="text-lg font-bold text-slate-800">
+                  Salvar Consulta
+                </h2>
+              </div>
+              {!saveModal.saving && !saveModal.savedId && (
+                <button
+                  onClick={closeSaveModal}
+                  className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-500 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6">
+              {saveModal.savedId ? (
+                <div className="text-center py-4">
+                  <CheckCircle className="w-14 h-14 text-green-500 mx-auto mb-3" />
+                  <p className="text-lg font-bold text-slate-800 mb-1">
+                    Consulta Salva!
+                  </p>
+                  <p className="text-sm text-slate-500">
+                    ID:{" "}
+                    <span className="font-semibold text-slate-700">
+                      #{saveModal.savedId}
+                    </span>
+                  </p>
+                  <p className="text-xs text-slate-400 mt-2">
+                    A consulta está disponível na tela de Consultas para
+                    acompanhamento.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <p className="text-sm text-slate-600 mb-4">
+                    Confirme os dados abaixo para salvar a consulta e monitorar
+                    o comparecimento do paciente.
+                  </p>
+
+                  <div className="space-y-2 bg-slate-50 rounded-xl p-4 text-sm">
+                    {saveModal.data?.patient_id && (
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">ID Paciente</span>
+                        <span className="font-medium text-slate-700">
+                          {saveModal.data.patient_id}
+                        </span>
+                      </div>
+                    )}
+                    {saveModal.data?.appointment_at && (
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Data da Consulta</span>
+                        <span className="font-medium text-slate-700">
+                          {new Date(
+                            saveModal.data.appointment_at,
+                          ).toLocaleDateString("pt-BR")}
+                        </span>
+                      </div>
+                    )}
+                    {saveModal.data?.unit_name && (
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Unidade</span>
+                        <span className="font-medium text-slate-700 text-right max-w-[60%]">
+                          {saveModal.data.unit_name}
+                        </span>
+                      </div>
+                    )}
+                    {saveModal.data?.specialty && (
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Especialidade</span>
+                        <span className="font-medium text-slate-700">
+                          {saveModal.data.specialty}
+                        </span>
+                      </div>
+                    )}
+                    {saveModal.data?.insurance_type && (
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Convênio</span>
+                        <span className="font-medium text-slate-700">
+                          {saveModal.data.insurance_type}
+                        </span>
+                      </div>
+                    )}
+                    {saveModal.data?.prediction_label && (
+                      <div className="flex justify-between pt-2 border-t border-slate-200 mt-2">
+                        <span className="text-slate-500">Predição</span>
+                        <span
+                          className={`font-bold ${
+                            saveModal.data.prediction_label === "No-Show"
+                              ? "text-red-600"
+                              : "text-green-600"
+                          }`}
+                        >
+                          {saveModal.data.prediction_label === "No-Show"
+                            ? "Falta"
+                            : "Presença"}{" "}
+                          (
+                          {saveModal.data.probability_no_show != null
+                            ? (
+                                saveModal.data.probability_no_show * 100
+                              ).toFixed(1)
+                            : "—"}
+                          %)
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {saveModal.error && (
+                    <div className="mt-3 bg-red-50 border border-red-200 rounded-lg p-3">
+                      <p className="text-xs text-red-700">{saveModal.error}</p>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 pb-6 flex gap-3">
+              {saveModal.savedId ? (
+                <button
+                  onClick={closeSaveModal}
+                  className="w-full bg-blue-600 text-white font-semibold py-2 px-4 rounded-xl hover:bg-blue-700 transition-colors"
+                >
+                  Fechar
+                </button>
+              ) : (
+                <>
+                  <button
+                    onClick={closeSaveModal}
+                    disabled={saveModal.saving}
+                    className="flex-1 bg-slate-100 text-slate-700 font-semibold py-2 px-4 rounded-xl hover:bg-slate-200 transition-colors disabled:opacity-50"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleConfirmSave}
+                    disabled={saveModal.saving}
+                    className="flex-1 bg-blue-600 text-white font-semibold py-2 px-4 rounded-xl hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {saveModal.saving ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Salvando...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4" />
+                        Confirmar
+                      </>
+                    )}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

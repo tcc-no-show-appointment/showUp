@@ -88,11 +88,29 @@ export const updateAppointmentStatus = async (
   return response.data;
 };
 
+/**
+ * Register patient attendance feedback and trigger the training pipeline.
+ *
+ * @param appointmentId - The appointment ID
+ * @param appointmentStatus - "Realizado" (showed up) | "Falta" (no-show) | "Cancelado"
+ */
+export const updateAppointmentFeedback = async (
+  appointmentId: number,
+  appointmentStatus: "Realizado" | "Falta" | "Cancelado"
+): Promise<AppointmentResponse> => {
+  const response = await predictionApi.patch<AppointmentResponse>(
+    `/appointments/feedback/${appointmentId}`,
+    { appointment_status: appointmentStatus }
+  );
+  return response.data;
+};
+
 export const appointmentService = {
   getAppointments,
   getAppointmentById,
   createAppointment,
   updateAppointmentStatus,
+  updateAppointmentFeedback,
 };
 
 export default appointmentService;

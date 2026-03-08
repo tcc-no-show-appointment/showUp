@@ -1,163 +1,138 @@
-import React, { useState } from "react";
-import { CheckCircle, XCircle, AlertTriangle, Clock } from "lucide-react";
+import React, { useState, useEffect, useCallback } from "react";
+import {
+  CheckCircle,
+  XCircle,
+  AlertTriangle,
+  Clock,
+  Loader2,
+  AlertCircle,
+  ChevronLeft,
+  ChevronRight,
+  RefreshCw,
+} from "lucide-react";
+import { appointmentService } from "../services";
+
+const PAGE_SIZE = 20;
+
+const getRiskLevel = (probabilityNoShow) => {
+  if (probabilityNoShow == null) return null;
+  if (probabilityNoShow > 0.7) return "High";
+  if (probabilityNoShow > 0.4) return "Medium";
+  return "Low";
+};
 
 const Appointments = () => {
-  // Mock appointments data
-  const [appointments, setAppointments] = useState([
-    {
-      id: 1,
-      name: "Maria Silva",
-      time: "08:30",
-      risk: "High",
-      riskValue: 85,
-      status: null,
-      selected: false,
-    },
-    {
-      id: 2,
-      name: "João Santos",
-      time: "09:00",
-      risk: "Low",
-      riskValue: 15,
-      status: null,
-      selected: false,
-    },
-    {
-      id: 3,
-      name: "Ana Costa",
-      time: "09:30",
-      risk: "Medium",
-      riskValue: 52,
-      status: null,
-      selected: false,
-    },
-    {
-      id: 4,
-      name: "Pedro Oliveira",
-      time: "10:00",
-      risk: "High",
-      riskValue: 78,
-      status: null,
-      selected: false,
-    },
-    {
-      id: 5,
-      name: "Sofia Lima",
-      time: "10:30",
-      risk: "Low",
-      riskValue: 22,
-      status: null,
-      selected: false,
-    },
-    {
-      id: 6,
-      name: "Lucas Ferreira",
-      time: "11:00",
-      risk: "Medium",
-      riskValue: 45,
-      status: null,
-      selected: false,
-    },
-    {
-      id: 7,
-      name: "Beatriz Sousa",
-      time: "11:30",
-      risk: "High",
-      riskValue: 92,
-      status: null,
-      selected: false,
-    },
-    {
-      id: 8,
-      name: "Rafael Rodrigues",
-      time: "14:00",
-      risk: "Low",
-      riskValue: 18,
-      status: null,
-      selected: false,
-    },
-    {
-      id: 9,
-      name: "Carolina Alves",
-      time: "14:30",
-      risk: "Medium",
-      riskValue: 58,
-      status: null,
-      selected: false,
-    },
-    {
-      id: 10,
-      name: "Gabriel Mendes",
-      time: "15:00",
-      risk: "Low",
-      riskValue: 12,
-      status: null,
-      selected: false,
-    },
-  ]);
+  const [appointments, setAppointments] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [feedbackLoading, setFeedbackLoading] = useState({});
+  const [feedbackError, setFeedbackError] = useState({});
 
-  const [selectAll, setSelectAll] = useState(false);
+  const fetchAppointments = useCallback(async (currentPage) => {
+    setLoading(true);
+    setError("");
+    try {
+      const data = await appointmentService.getAppointments({
+        page: currentPage,
+        pageSize: PAGE_SIZE,
+      });
+      setAppointments(data.appointments);
+      setTotal(data.total);
+    } catch (err) {
+      setError(
+        err.response?.data?.detail ||
+          err.message ||
+          "Erro ao carregar consultas. Tente novamente.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  const handleSelectAll = () => {
-    const newSelectAll = !selectAll;
-    setSelectAll(newSelectAll);
-    setAppointments(
-      appointments.map((apt) => ({ ...apt, selected: newSelectAll })),
-    );
+  useEffect(() => {
+    fetchAppointments(page);
+  }, [page, fetchAppointments]);
+
+  const handleFeedback = async (appointmentId, status) => {
+    setFeedbackLoading((prev) => ({ ...prev, [appointmentId]: true }));
+    setFeedbackError((prev) => ({ ...prev, [appointmentId]: "" }));
+    try {
+      const updated = await appointmentService.updateAppointmentFeedback(
+        appointmentId,
+        status,
+      );
+      setAppointments((prev) =>
+        prev.map((apt) =>
+          apt.appointment_prediction_id === appointmentId
+            ? { ...apt, appointment_status: updated.appointment_status }
+            : apt,
+        ),
+      );
+    } catch (err) {
+      setFeedbackError((prev) => ({
+        ...prev,
+        [appointmentId]:
+          err.response?.data?.detail ||
+          err.message ||
+          "Erro ao registrar feedback.",
+      }));
+    } finally {
+      setFeedbackLoading((prev) => ({ ...prev, [appointmentId]: false }));
+    }
   };
 
-  const handleSelectAppointment = (id) => {
-    setAppointments(
-      appointments.map((apt) =>
-        apt.id === id ? { ...apt, selected: !apt.selected } : apt,
-      ),
-    );
-    // Update selectAll if needed
-    const newAppointments = appointments.map((apt) =>
-      apt.id === id ? { ...apt, selected: !apt.selected } : apt,
-    );
-    setSelectAll(newAppointments.every((apt) => apt.selected));
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  const stats = {
+    total,
+    high: appointments.filter(
+      (a) => getRiskLevel(a.probability_no_show) === "High",
+    ).length,
+    medium: appointments.filter(
+      (a) => getRiskLevel(a.probability_no_show) === "Medium",
+    ).length,
+    low: appointments.filter(
+      (a) => getRiskLevel(a.probability_no_show) === "Low",
+    ).length,
   };
 
-  const handleMarkStatus = (status) => {
-    setAppointments(
-      appointments.map((apt) =>
-        apt.selected ? { ...apt, status, selected: false } : apt,
-      ),
-    );
-    setSelectAll(false);
-  };
+  const getRiskBadge = (probabilityNoShow) => {
+    const risk = getRiskLevel(probabilityNoShow);
+    if (!risk) return <span className="text-xs text-slate-400">—</span>;
 
-  const selectedCount = appointments.filter((apt) => apt.selected).length;
-
-  const getRiskBadge = (risk, riskValue) => {
-    const colors = {
-      High: "bg-red-100 text-red-700 border-red-200",
-      Medium: "bg-yellow-100 text-yellow-700 border-yellow-200",
-      Low: "bg-green-100 text-green-700 border-green-200",
+    const configs = {
+      High: {
+        cls: "bg-red-100 text-red-700 border-red-200",
+        icon: <AlertTriangle className="w-3 h-3" />,
+        label: "Alto",
+      },
+      Medium: {
+        cls: "bg-yellow-100 text-yellow-700 border-yellow-200",
+        icon: <Clock className="w-3 h-3" />,
+        label: "Médio",
+      },
+      Low: {
+        cls: "bg-green-100 text-green-700 border-green-200",
+        icon: <CheckCircle className="w-3 h-3" />,
+        label: "Baixo",
+      },
     };
-
-    const icons = {
-      High: <AlertTriangle className="w-3 h-3" />,
-      Medium: <Clock className="w-3 h-3" />,
-      Low: <CheckCircle className="w-3 h-3" />,
-    };
-
-    const labels = {
-      High: "Alto",
-      Medium: "Médio",
-      Low: "Baixo",
-    };
-
+    const { cls, icon, label } = configs[risk];
     return (
       <div className="flex items-center gap-2">
         <span
-          className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold border ${colors[risk]}`}
+          className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold border ${cls}`}
         >
-          {icons[risk]}
-          {labels[risk]}
+          {icon}
+          {label}
         </span>
-        <span className="text-xs text-slate-500">{riskValue}%</span>
+        {probabilityNoShow != null && (
+          <span className="text-xs text-slate-500">
+            {(probabilityNoShow * 100).toFixed(1)}%
+          </span>
+        )}
       </div>
     );
   };
@@ -165,157 +140,243 @@ const Appointments = () => {
   const getStatusBadge = (status) => {
     if (!status)
       return <span className="text-xs text-slate-400">Pendente</span>;
-
-    if (status === "show") {
+    if (status === "Realizado")
       return (
         <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold bg-green-100 text-green-700 border border-green-200">
           <CheckCircle className="w-3 h-3" />
           Compareceu
         </span>
       );
-    }
-
+    if (status === "Falta")
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold bg-red-100 text-red-700 border border-red-200">
+          <XCircle className="w-3 h-3" />
+          Faltou
+        </span>
+      );
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold bg-red-100 text-red-700 border border-red-200">
-        <XCircle className="w-3 h-3" />
-        Faltou
+      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+        {status}
       </span>
     );
-  };
-
-  const stats = {
-    total: appointments.length,
-    high: appointments.filter((a) => a.risk === "High").length,
-    medium: appointments.filter((a) => a.risk === "Medium").length,
-    low: appointments.filter((a) => a.risk === "Low").length,
   };
 
   return (
     <div className="p-8">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-800 mb-2">
-          Consultas de Hoje
-        </h1>
-        <p className="text-slate-500">
-          Gerencie consultas e forneça feedback para melhorar a IA
-        </p>
+      <div className="mb-8 flex items-start justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-800 mb-2">
+            Consultas Salvas
+          </h1>
+          <p className="text-slate-500">
+            Gerencie consultas e forneça feedback para melhorar a IA
+          </p>
+        </div>
+        <button
+          onClick={() => fetchAppointments(page)}
+          disabled={loading}
+          className="flex items-center gap-2 bg-white border border-slate-300 text-slate-600 font-medium py-2 px-4 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50"
+        >
+          <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+          Atualizar
+        </button>
       </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-white rounded-xl shadow-sm p-4 border border-slate-200">
           <p className="text-sm text-slate-500 mb-1">Total de Consultas</p>
-          <p className="text-2xl font-bold text-slate-800">{stats.total}</p>
+          <p className="text-2xl font-bold text-slate-800">{total}</p>
         </div>
         <div className="bg-white rounded-xl shadow-sm p-4 border border-red-200">
-          <p className="text-sm text-slate-500 mb-1">Risco Alto</p>
+          <p className="text-sm text-slate-500 mb-1">Risco Alto (pág.)</p>
           <p className="text-2xl font-bold text-red-600">{stats.high}</p>
         </div>
         <div className="bg-white rounded-xl shadow-sm p-4 border border-yellow-200">
-          <p className="text-sm text-slate-500 mb-1">Risco Médio</p>
+          <p className="text-sm text-slate-500 mb-1">Risco Médio (pág.)</p>
           <p className="text-2xl font-bold text-yellow-600">{stats.medium}</p>
         </div>
         <div className="bg-white rounded-xl shadow-sm p-4 border border-green-200">
-          <p className="text-sm text-slate-500 mb-1">Risco Baixo</p>
+          <p className="text-sm text-slate-500 mb-1">Risco Baixo (pág.)</p>
           <p className="text-2xl font-bold text-green-600">{stats.low}</p>
         </div>
       </div>
 
+      {/* Error State */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-red-700">{error}</p>
+        </div>
+      )}
+
       {/* Table */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-slate-50 border-b border-slate-200">
-              <tr>
-                <th className="px-6 py-4 text-left">
-                  <input
-                    type="checkbox"
-                    checked={selectAll}
-                    onChange={handleSelectAll}
-                    className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-2 focus:ring-blue-500"
-                  />
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                  Nome do Paciente
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                  Horário
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                  Nível de Risco
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                  Status Real
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200">
-              {appointments.map((appointment) => (
-                <tr
-                  key={appointment.id}
-                  className={`hover:bg-slate-50 transition-colors ${
-                    appointment.selected ? "bg-blue-50" : ""
-                  }`}
-                >
-                  <td className="px-6 py-4">
-                    <input
-                      type="checkbox"
-                      checked={appointment.selected}
-                      onChange={() => handleSelectAppointment(appointment.id)}
-                      className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-2 focus:ring-blue-500"
-                    />
-                  </td>
-                  <td className="px-6 py-4">
-                    <p className="font-medium text-slate-800">
-                      {appointment.name}
-                    </p>
-                  </td>
-                  <td className="px-6 py-4">
-                    <p className="text-sm text-slate-600">{appointment.time}</p>
-                  </td>
-                  <td className="px-6 py-4">
-                    {getRiskBadge(appointment.risk, appointment.riskValue)}
-                  </td>
-                  <td className="px-6 py-4">
-                    {getStatusBadge(appointment.status)}
-                  </td>
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+          </div>
+        ) : appointments.length === 0 ? (
+          <div className="text-center py-20">
+            <Clock className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+            <p className="text-slate-500 font-medium">
+              Nenhuma consulta salva ainda.
+            </p>
+            <p className="text-slate-400 text-sm mt-1">
+              Salve consultas na tela de Predição para acompanhá-las aqui.
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-slate-50 border-b border-slate-200">
+                <tr>
+                  <th className="px-4 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                    ID / Paciente
+                  </th>
+                  <th className="px-4 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                    Data Consulta
+                  </th>
+                  <th className="px-4 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                    Unidade / Especialidade
+                  </th>
+                  <th className="px-4 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                    Risco IA
+                  </th>
+                  <th className="px-4 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-4 py-4 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                    Feedback
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                {appointments.map((apt) => {
+                  const id = apt.appointment_prediction_id;
+                  const isPending = !apt.appointment_status;
+                  return (
+                    <tr
+                      key={id}
+                      className="hover:bg-slate-50 transition-colors"
+                    >
+                      <td className="px-4 py-4">
+                        <p className="font-semibold text-slate-800 text-sm">
+                          #{id}
+                        </p>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          {apt.patient_id || "—"}
+                        </p>
+                      </td>
+                      <td className="px-4 py-4">
+                        <p className="text-sm text-slate-700">
+                          {apt.appointment_at
+                            ? new Date(apt.appointment_at).toLocaleDateString(
+                                "pt-BR",
+                              )
+                            : "—"}
+                        </p>
+                        <p className="text-xs text-slate-400">
+                          {apt.appointment_at
+                            ? new Date(apt.appointment_at).toLocaleTimeString(
+                                "pt-BR",
+                                {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                },
+                              )
+                            : ""}
+                        </p>
+                      </td>
+                      <td className="px-4 py-4">
+                        <p className="text-sm text-slate-700 font-medium">
+                          {apt.unit_name || "—"}
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          {apt.specialty || "—"}
+                        </p>
+                      </td>
+                      <td className="px-4 py-4">
+                        {getRiskBadge(apt.probability_no_show)}
+                      </td>
+                      <td className="px-4 py-4">
+                        {getStatusBadge(apt.appointment_status)}
+                      </td>
+                      <td className="px-4 py-4">
+                        {isPending ? (
+                          <div className="flex flex-col items-center gap-1">
+                            <div className="flex gap-2 justify-center">
+                              <button
+                                onClick={() => handleFeedback(id, "Realizado")}
+                                disabled={feedbackLoading[id]}
+                                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-green-600 text-white hover:bg-green-700 transition-colors disabled:opacity-50"
+                              >
+                                {feedbackLoading[id] ? (
+                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                ) : (
+                                  <CheckCircle className="w-3 h-3" />
+                                )}
+                                Compareceu
+                              </button>
+                              <button
+                                onClick={() => handleFeedback(id, "Falta")}
+                                disabled={feedbackLoading[id]}
+                                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-50"
+                              >
+                                {feedbackLoading[id] ? (
+                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                ) : (
+                                  <XCircle className="w-3 h-3" />
+                                )}
+                                Faltou
+                              </button>
+                            </div>
+                            {feedbackError[id] && (
+                              <p className="text-xs text-red-600 mt-1 text-center">
+                                {feedbackError[id]}
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-slate-400 text-center block">
+                            Registrado
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
-      {/* Floating Action Bar */}
-      {selectedCount > 0 && (
-        <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50 animate-slide-up">
-          <div className="bg-white rounded-xl shadow-lg border border-slate-200 px-6 py-4">
-            <div className="flex items-center gap-6">
-              <p className="text-sm font-medium text-slate-700">
-                <span className="font-bold text-blue-600">{selectedCount}</span>{" "}
-                consulta{selectedCount > 1 ? "s" : ""} selecionada
-                {selectedCount > 1 ? "s" : ""}
-              </p>
-
-              <div className="flex gap-3">
-                <button
-                  onClick={() => handleMarkStatus("show")}
-                  className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors duration-200"
-                >
-                  <CheckCircle className="w-4 h-4" />
-                  Marcar Comparecimento
-                </button>
-
-                <button
-                  onClick={() => handleMarkStatus("no-show")}
-                  className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors duration-200"
-                >
-                  <XCircle className="w-4 h-4" />
-                  Marcar Falta
-                </button>
-              </div>
-            </div>
+      {/* Pagination */}
+      {!loading && totalPages > 1 && (
+        <div className="flex items-center justify-between mt-4">
+          <p className="text-sm text-slate-500">
+            Página {page} de {totalPages} &mdash; {total} consulta
+            {total !== 1 ? "s" : ""} no total
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page === 1 || loading}
+              className="flex items-center gap-1 px-3 py-2 rounded-lg border border-slate-300 text-slate-600 text-sm hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              Anterior
+            </button>
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages || loading}
+              className="flex items-center gap-1 px-3 py-2 rounded-lg border border-slate-300 text-slate-600 text-sm hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Próxima
+              <ChevronRight className="w-4 h-4" />
+            </button>
           </div>
         </div>
       )}
