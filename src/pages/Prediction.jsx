@@ -311,7 +311,15 @@ const Prediction = () => {
           "Especialidade",
         ];
 
-        const missingFields = requiredFields.filter((field) => !appt[field]);
+        const missingFields = requiredFields.filter((field) => {
+          const v = appt[field];
+          return (
+            v === null ||
+            v === undefined ||
+            v === "" ||
+            (field === "Idade" && (isNaN(v) || v === null))
+          );
+        });
         if (missingFields.length > 0) {
           throw new Error(
             `Registro ${index + 1}: campos obrigatórios faltando: ${missingFields.join(", ")}`,
@@ -349,11 +357,24 @@ const Prediction = () => {
       setBatchResults(result);
     } catch (error) {
       console.error("Batch prediction error:", error);
-      setBatchError(
-        error.response?.data?.detail ||
+      const detail = error.response?.data?.detail;
+      let errorMessage;
+      if (Array.isArray(detail)) {
+        // FastAPI 422 returns detail as array of {loc, msg, input, type}
+        errorMessage = detail
+          .map((d) => {
+            const field = d.loc?.slice(1).join(" → ") ?? "campo desconhecido";
+            return `${field}: ${d.msg}`;
+          })
+          .join("\n");
+      } else if (typeof detail === "string") {
+        errorMessage = detail;
+      } else {
+        errorMessage =
           error.message ||
-          "Erro ao processar predições em lote. Tente novamente.",
-      );
+          "Erro ao processar predições em lote. Tente novamente.";
+      }
+      setBatchError(errorMessage);
     } finally {
       setBatchLoading(false);
     }
@@ -378,7 +399,7 @@ const Prediction = () => {
       result.appointment.UnidadeAtendimento,
       result.appointment.Especialidade,
       new Date(result.appointment.DataHoraConsulta).toLocaleDateString("pt-BR"),
-      result.prediction_label === "No-Show" ? "Falta" : "Presença",
+      result.prediction_label === "no-show" ? "Falta" : "Presença",
       (result.probability_no_show * 100).toFixed(2),
       (result.probability_show * 100).toFixed(2),
     ]);
@@ -663,7 +684,6 @@ const Prediction = () => {
                         placeholderText="dd/mm/aaaa"
                         className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                         required
-                        onKeyDown={(e) => e.preventDefault()}
                       />
                     </div>
 
@@ -682,7 +702,6 @@ const Prediction = () => {
                         placeholderText="dd/mm/aaaa"
                         className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                         required
-                        onKeyDown={(e) => e.preventDefault()}
                       />
                     </div>
 
@@ -815,10 +834,13 @@ const Prediction = () => {
                       </select>
                     </div>
 
-                    {/* idUnicoPaciente
+                    {/* idUnicoPaciente */}
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-2">
-                        ID Único do Paciente
+                        ID Único do Paciente{" "}
+                        <span className="text-slate-400 font-normal text-xs">
+                          (opcional)
+                        </span>
                       </label>
                       <input
                         type="text"
@@ -828,7 +850,7 @@ const Prediction = () => {
                         className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                         placeholder="Digite o ID do paciente (opcional)"
                       />
-                    </div> */}
+                    </div>
 
                     {/* UnidadeAtendimento */}
                     <div>
@@ -990,12 +1012,12 @@ const Prediction = () => {
                         <p className="text-xs text-slate-500 mb-1">Predição</p>
                         <p
                           className={`text-lg font-bold ${
-                            riskResult.predictionLabel === "No-Show"
+                            riskResult.predictionLabel === "no-show"
                               ? "text-red-600"
                               : "text-green-600"
                           }`}
                         >
-                          {riskResult.predictionLabel === "No-Show"
+                          {riskResult.predictionLabel === "no-show"
                             ? "Falta"
                             : "Presença"}
                         </p>
@@ -1103,7 +1125,11 @@ const Prediction = () => {
                           <p className="text-sm font-medium text-red-800 mb-1">
                             Erro no processamento em lote
                           </p>
-                          <p className="text-xs text-red-700">{batchError}</p>
+                          <div className="text-xs text-red-700 space-y-0.5">
+                            {batchError.split("\n").map((line, i) => (
+                              <p key={i}>{line}</p>
+                            ))}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1294,12 +1320,12 @@ const Prediction = () => {
                               <td className="px-4 py-3 text-center">
                                 <span
                                   className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold ${
-                                    result.prediction_label === "No-Show"
+                                    result.prediction_label === "no-show"
                                       ? "bg-red-100 text-red-700"
                                       : "bg-green-100 text-green-700"
                                   }`}
                                 >
-                                  {result.prediction_label === "No-Show" ? (
+                                  {result.prediction_label === "no-show" ? (
                                     <>
                                       <XCircle className="w-3 h-3" />
                                       Falta
@@ -1437,12 +1463,12 @@ const Prediction = () => {
                         <span className="text-slate-500">Predição</span>
                         <span
                           className={`font-bold ${
-                            saveModal.data.prediction_label === "No-Show"
+                            saveModal.data.prediction_label === "no-show"
                               ? "text-red-600"
                               : "text-green-600"
                           }`}
                         >
-                          {saveModal.data.prediction_label === "No-Show"
+                          {saveModal.data.prediction_label === "no-show"
                             ? "Falta"
                             : "Presença"}{" "}
                           (

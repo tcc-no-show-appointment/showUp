@@ -26,7 +26,7 @@ export interface PredictionRequest {
 
 export interface PredictionResponse {
   prediction: 0 | 1; // 0 = Show, 1 = No-Show
-  prediction_label: "Show" | "No-Show";
+  prediction_label: "show" | "no-show";
   probability_show: number;
   probability_no_show: number;
 }
@@ -38,7 +38,7 @@ export interface BatchPredictionRequest {
 export interface AppointmentPredictionResult {
   appointment: PredictionRequest;
   prediction: 0 | 1;
-  prediction_label: "Show" | "No-Show";
+  prediction_label: "show" | "no-show";
   probability_show: number;
   probability_no_show: number;
 }
@@ -58,7 +58,7 @@ export interface RangePredictionRequest {
 export interface DatePrediction {
   date: string; // YYYY-MM-DD
   prediction: 0 | 1;
-  prediction_label: "Show" | "No-Show";
+  prediction_label: "show" | "no-show";
   probability_no_show: number;
   probability_show: number;
 }
@@ -100,7 +100,7 @@ export interface AppointmentCreate {
   unit_zipcode?: string;
   specialty?: string;
   prediction_class?: 0 | 1;
-  prediction_label?: "Show" | "No-Show";
+  prediction_label?: "show" | "no-show";
   probability_show?: number;
   probability_no_show?: number;
 }
