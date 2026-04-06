@@ -20,7 +20,7 @@ const TRAINING_API_BASE_URL =
 export const predictionApi = axios.create({
   baseURL: PREDICTION_API_BASE_URL,
   headers: { "Content-Type": "application/json" },
-  timeout: 30000, // 30 s
+  timeout: 300000,
 });
 
 /**
