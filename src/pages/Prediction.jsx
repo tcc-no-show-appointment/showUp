@@ -58,6 +58,7 @@ const Prediction = () => {
   const [batchLoading, setBatchLoading] = useState(false);
   const [batchError, setBatchError] = useState("");
   const [batchResults, setBatchResults] = useState(null);
+  const [saveAllState, setSaveAllState] = useState(null); // null | { saving, saved, failed, total }
 
   // Save modal states
   const [saveModal, setSaveModal] = useState({
@@ -163,7 +164,19 @@ const Prediction = () => {
 
     // Parse CSV file
     if (file.name.endsWith(".csv")) {
-      const text = await file.text();
+      const buffer = await file.arrayBuffer();
+
+      // Try UTF-8 first (strict); fall back to Windows-1252 (common in Brazilian Excel exports)
+      let text;
+      try {
+        text = new TextDecoder("utf-8", { fatal: true }).decode(buffer);
+      } catch (_e) {
+        text = new TextDecoder("windows-1252").decode(buffer);
+      }
+
+      // Strip UTF-8 BOM if present
+      text = text.replace(/^\uFEFF/, "");
+
       try {
         const jsonData = parseCSVToJSON(text);
         setBatchJsonInput(JSON.stringify(jsonData, null, 2));
@@ -285,14 +298,14 @@ const Prediction = () => {
         throw new Error("Os dados devem ser um array de consultas.");
       }
 
-      // Validate max 1000 appointments
+      // Validate max 500 appointments
       if (appointments.length === 0) {
         throw new Error("Nenhuma consulta encontrada para processar.");
       }
 
       if (appointments.length > 1000) {
         throw new Error(
-          `Máximo de 1000 consultas por lote. Você tentou processar ${appointments.length}.`,
+          `Máximo de 500 consultas por lote. Você tentou processar ${appointments.length}.`,
         );
       }
 
@@ -461,10 +474,12 @@ const Prediction = () => {
       const result = await predictionService.predict(requestData);
 
       // Transform API response to UI format
-      const probabilityNoShowPercent = Math.round(
-        result.probability_no_show * 100,
+      const probabilityNoShowPercent = parseFloat(
+        (result.probability_no_show * 100).toFixed(1),
       );
-      const probabilityShowPercent = Math.round(result.probability_show * 100);
+      const probabilityShowPercent = parseFloat(
+        (result.probability_show * 100).toFixed(1),
+      );
 
       setRiskResult({
         risk: probabilityNoShowPercent,
@@ -505,6 +520,26 @@ const Prediction = () => {
       savedId: null,
       error: "",
     });
+  };
+
+  const handleSaveAll = async () => {
+    if (!batchResults) return;
+    const total = batchResults.results.length;
+    setSaveAllState({ saving: true, saved: 0, failed: 0, total });
+    let saved = 0;
+    let failed = 0;
+    for (const result of batchResults.results) {
+      try {
+        await appointmentService.createAppointment(
+          buildBatchItemPayload(result),
+        );
+        saved += 1;
+      } catch {
+        failed += 1;
+      }
+      setSaveAllState({ saving: true, saved, failed, total });
+    }
+    setSaveAllState({ saving: false, saved, failed, total });
   };
 
   const closeSaveModal = () => {
@@ -971,7 +1006,11 @@ const Prediction = () => {
                           Probabilidade de Falta
                         </p>
                         <p className="text-4xl font-bold text-slate-800">
-                          {riskResult.risk}%
+                          {riskResult.risk.toLocaleString("pt-BR", {
+                            minimumFractionDigits: 1,
+                            maximumFractionDigits: 1,
+                          })}
+                          %
                         </p>
                       </div>
 
@@ -982,13 +1021,24 @@ const Prediction = () => {
                             Prob. Presença:
                           </span>
                           <span className="font-semibold text-green-600">
-                            {(100 - riskResult.risk).toFixed(1)}%
+                            {riskResult.probabilityShow.toLocaleString(
+                              "pt-BR",
+                              {
+                                minimumFractionDigits: 1,
+                                maximumFractionDigits: 1,
+                              },
+                            )}
+                            %
                           </span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-slate-600">Prob. Falta:</span>
                           <span className="font-semibold text-red-600">
-                            {riskResult.risk}%
+                            {riskResult.risk.toLocaleString("pt-BR", {
+                              minimumFractionDigits: 1,
+                              maximumFractionDigits: 1,
+                            })}
+                            %
                           </span>
                         </div>
                       </div>
@@ -1247,26 +1297,70 @@ const Prediction = () => {
                   </div>
 
                   {/* Actions */}
-                  <div className="flex gap-3">
-                    <button
-                      onClick={handleDownloadResults}
-                      className="flex items-center gap-2 bg-green-600 text-white font-semibold py-3 px-6 rounded-xl hover:bg-green-700 transition-colors"
-                    >
-                      <Download className="w-5 h-5" />
-                      Baixar Resultados (CSV)
-                    </button>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
                     <button
                       onClick={() => {
                         setBatchResults(null);
                         setBatchJsonInput("");
                         setBatchFile(null);
                         setBatchError("");
+                        setSaveAllState(null);
                       }}
                       className="flex items-center gap-2 bg-slate-200 text-slate-700 font-semibold py-3 px-6 rounded-xl hover:bg-slate-300 transition-colors"
                     >
                       Nova Predição
                     </button>
+                    <div className="flex flex-wrap gap-3">
+                      <button
+                        onClick={handleDownloadResults}
+                        className="flex items-center gap-2 bg-green-600 text-white font-semibold py-3 px-6 rounded-xl hover:bg-green-700 transition-colors"
+                      >
+                        <Download className="w-5 h-5" />
+                        Baixar Resultados (CSV)
+                      </button>
+                      <button
+                        onClick={handleSaveAll}
+                        disabled={
+                          saveAllState?.saving ||
+                          (saveAllState && !saveAllState.saving)
+                        }
+                        className="flex items-center gap-2 bg-blue-600 text-white font-semibold py-3 px-6 rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        {saveAllState?.saving ? (
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                        ) : (
+                          <Save className="w-5 h-5" />
+                        )}
+                        Salvar Todas
+                      </button>
+                    </div>
                   </div>
+
+                  {/* Save All progress / result feedback */}
+                  {saveAllState && (
+                    <div
+                      className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm ${
+                        saveAllState.saving
+                          ? "bg-blue-50 border border-blue-200 text-blue-700"
+                          : saveAllState.failed === 0
+                            ? "bg-green-50 border border-green-200 text-green-700"
+                            : "bg-yellow-50 border border-yellow-200 text-yellow-700"
+                      }`}
+                    >
+                      {saveAllState.saving ? (
+                        <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                      ) : saveAllState.failed === 0 ? (
+                        <CheckCircle className="w-4 h-4 shrink-0" />
+                      ) : (
+                        <AlertCircle className="w-4 h-4 shrink-0" />
+                      )}
+                      {saveAllState.saving
+                        ? `Salvando… ${saveAllState.saved + saveAllState.failed} de ${saveAllState.total}`
+                        : saveAllState.failed === 0
+                          ? `${saveAllState.saved} consulta${saveAllState.saved !== 1 ? "s" : ""} salva${saveAllState.saved !== 1 ? "s" : ""} com sucesso.`
+                          : `${saveAllState.saved} salva${saveAllState.saved !== 1 ? "s" : ""}, ${saveAllState.failed} com falha. Tente salvar as falhas individualmente.`}
+                    </div>
+                  )}
 
                   {/* Results Table */}
                   <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">

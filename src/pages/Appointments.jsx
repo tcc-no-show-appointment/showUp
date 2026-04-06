@@ -29,10 +29,14 @@ const Appointments = () => {
   const [error, setError] = useState("");
   const [feedbackLoading, setFeedbackLoading] = useState({});
   const [feedbackError, setFeedbackError] = useState({});
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [bulkState, setBulkState] = useState(null); // null | { loading, done, failed, total }
 
   const fetchAppointments = useCallback(async (currentPage) => {
     setLoading(true);
     setError("");
+    setSelectedIds(new Set());
+    setBulkState(null);
     try {
       const data = await appointmentService.getAppointments({
         page: currentPage,
@@ -84,6 +88,60 @@ const Appointments = () => {
   };
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  const pendingAppointments = appointments.filter((a) => !a.appointment_status);
+  const allPendingSelected =
+    pendingAppointments.length > 0 &&
+    pendingAppointments.every((a) =>
+      selectedIds.has(a.appointment_prediction_id),
+    );
+
+  const toggleRow = (id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAllPending = () => {
+    if (allPendingSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(
+        new Set(pendingAppointments.map((a) => a.appointment_prediction_id)),
+      );
+    }
+  };
+
+  const handleBulkFeedback = async (status) => {
+    if (selectedIds.size === 0) return;
+    const ids = [...selectedIds];
+    setBulkState({ loading: true, done: 0, failed: 0, total: ids.length });
+    let done = 0;
+    let failed = 0;
+    for (const id of ids) {
+      try {
+        const updated = await appointmentService.updateAppointmentFeedback(
+          id,
+          status,
+        );
+        setAppointments((prev) =>
+          prev.map((apt) =>
+            apt.appointment_prediction_id === id
+              ? { ...apt, appointment_status: updated.appointment_status }
+              : apt,
+          ),
+        );
+        done += 1;
+      } catch {
+        failed += 1;
+      }
+      setBulkState({ loading: true, done, failed, total: ids.length });
+    }
+    setBulkState({ loading: false, done, failed, total: ids.length });
+    setSelectedIds(new Set());
+  };
 
   const stats = {
     total,
@@ -211,6 +269,50 @@ const Appointments = () => {
         </div>
       )}
 
+      {/* Bulk action bar */}
+      {selectedIds.size > 0 && (
+        <div className="flex flex-wrap items-center gap-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 mb-4">
+          <span className="text-sm font-medium text-blue-700">
+            {selectedIds.size} selecionada{selectedIds.size !== 1 ? "s" : ""}
+          </span>
+          <button
+            onClick={() => handleBulkFeedback("Realizado")}
+            disabled={bulkState?.loading}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-green-600 text-white hover:bg-green-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {bulkState?.loading ? (
+              <Loader2 className="w-3 h-3 animate-spin" />
+            ) : (
+              <CheckCircle className="w-3 h-3" />
+            )}
+            Marcar como Compareceu
+          </button>
+          <button
+            onClick={() => handleBulkFeedback("Falta")}
+            disabled={bulkState?.loading}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {bulkState?.loading ? (
+              <Loader2 className="w-3 h-3 animate-spin" />
+            ) : (
+              <XCircle className="w-3 h-3" />
+            )}
+            Marcar como Faltou
+          </button>
+          {bulkState && !bulkState.loading && (
+            <span
+              className={`text-xs font-medium ml-auto ${
+                bulkState.failed === 0 ? "text-green-700" : "text-yellow-700"
+              }`}
+            >
+              {bulkState.failed === 0
+                ? `${bulkState.done} marcada${bulkState.done !== 1 ? "s" : ""} com sucesso`
+                : `${bulkState.done} ok, ${bulkState.failed} com falha`}
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Table */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         {loading ? (
@@ -232,6 +334,15 @@ const Appointments = () => {
             <table className="w-full">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
+                  <th className="px-4 py-4 text-center">
+                    <input
+                      type="checkbox"
+                      checked={allPendingSelected}
+                      onChange={toggleAllPending}
+                      title="Selecionar todas as pendentes"
+                      className="w-4 h-4 rounded border-slate-300 text-blue-600 cursor-pointer"
+                    />
+                  </th>
                   <th className="px-4 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
                     ID / Paciente
                   </th>
@@ -256,11 +367,24 @@ const Appointments = () => {
                 {appointments.map((apt) => {
                   const id = apt.appointment_prediction_id;
                   const isPending = !apt.appointment_status;
+                  const isSelected = selectedIds.has(id);
                   return (
                     <tr
                       key={id}
-                      className="hover:bg-slate-50 transition-colors"
+                      className={`hover:bg-slate-50 transition-colors ${isSelected ? "bg-blue-50" : ""}`}
                     >
+                      <td className="px-4 py-4 text-center">
+                        {isPending ? (
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleRow(id)}
+                            className="w-4 h-4 rounded border-slate-300 text-blue-600 cursor-pointer"
+                          />
+                        ) : (
+                          <span className="w-4 h-4 inline-block" />
+                        )}
+                      </td>
                       <td className="px-4 py-4">
                         <p className="font-semibold text-slate-800 text-sm">
                           #{id}
