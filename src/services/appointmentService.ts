@@ -14,6 +14,8 @@ import type {
   AppointmentCreate,
   AppointmentBatchCreate,
   AppointmentBatchResponse,
+  FeedbackBatchRequest,
+  FeedbackBatchResponse,
 } from "../types/models";
 
 interface GetAppointmentsParams {
@@ -122,6 +124,21 @@ export const createAppointmentsBatch = async (
   return response.data;
 };
 
+/**
+ * Update attendance feedback for multiple appointments in a single request.
+ * More efficient than calling updateAppointmentFeedback() in a loop.
+ */
+export const updateAppointmentsFeedbackBatch = async (
+  feedbacks: { appointment_id: number; appointment_status: "Realizado" | "Falta" | "Cancelado" }[]
+): Promise<FeedbackBatchResponse> => {
+  const payload: FeedbackBatchRequest = { feedbacks };
+  const response = await predictionApi.patch<FeedbackBatchResponse>(
+    "/appointments/feedback/batch",
+    payload
+  );
+  return response.data;
+};
+
 export const appointmentService = {
   getAppointments,
   getAppointmentById,
@@ -129,6 +146,7 @@ export const appointmentService = {
   createAppointmentsBatch,
   updateAppointmentStatus,
   updateAppointmentFeedback,
+  updateAppointmentsFeedbackBatch,
 };
 
 export default appointmentService;
