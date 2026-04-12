@@ -74,6 +74,12 @@ const Appointments = () => {
             : apt,
         ),
       );
+      // Remove from selection — row is no longer pending so checkbox will disappear
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(appointmentId);
+        return next;
+      });
     } catch (err) {
       setFeedbackError((prev) => ({
         ...prev,
