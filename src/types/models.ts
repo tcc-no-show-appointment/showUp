@@ -151,6 +151,22 @@ export interface AppointmentBatchResponse {
   appointments: AppointmentResponse[];
 }
 
+export interface FeedbackItem {
+  appointment_id: number;
+  appointment_status: "Realizado" | "Falta" | "Cancelado";
+}
+
+export interface FeedbackBatchRequest {
+  feedbacks: FeedbackItem[]; // Max 250
+}
+
+export interface FeedbackBatchResponse {
+  total: number;
+  updated: number;
+  failed: number;
+  appointments: AppointmentResponse[];
+}
+
 // ============================================================================
 // TRAINING API — Training Models
 // ============================================================================

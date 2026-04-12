@@ -118,28 +118,38 @@ const Appointments = () => {
     if (selectedIds.size === 0) return;
     const ids = [...selectedIds];
     setBulkState({ loading: true, done: 0, failed: 0, total: ids.length });
-    let done = 0;
-    let failed = 0;
-    for (const id of ids) {
-      try {
-        const updated = await appointmentService.updateAppointmentFeedback(
-          id,
-          status,
-        );
-        setAppointments((prev) =>
-          prev.map((apt) =>
-            apt.appointment_prediction_id === id
-              ? { ...apt, appointment_status: updated.appointment_status }
-              : apt,
-          ),
-        );
-        done += 1;
-      } catch {
-        failed += 1;
-      }
-      setBulkState({ loading: true, done, failed, total: ids.length });
+    try {
+      const feedbacks = ids.map((id) => ({
+        appointment_id: id,
+        appointment_status: status,
+      }));
+      const result =
+        await appointmentService.updateAppointmentsFeedbackBatch(feedbacks);
+      setAppointments((prev) =>
+        prev.map((apt) => {
+          const updated = result.appointments.find(
+            (u) =>
+              u.appointment_prediction_id === apt.appointment_prediction_id,
+          );
+          return updated
+            ? { ...apt, appointment_status: updated.appointment_status }
+            : apt;
+        }),
+      );
+      setBulkState({
+        loading: false,
+        done: result.updated,
+        failed: result.failed,
+        total: ids.length,
+      });
+    } catch {
+      setBulkState({
+        loading: false,
+        done: 0,
+        failed: ids.length,
+        total: ids.length,
+      });
     }
-    setBulkState({ loading: false, done, failed, total: ids.length });
     setSelectedIds(new Set());
   };
 
