@@ -3,7 +3,7 @@ import React from 'react'
 const env = import.meta.env.VITE_ENVIRONMENT ?? import.meta.env.MODE
 
 const config: Record<string, { label: string; className: string }> = {
-  development: {
+  develop: {
     label: 'Ambiente de Desenvolvimento',
     className: 'bg-red-600 text-white',
   },
