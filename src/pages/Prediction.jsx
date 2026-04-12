@@ -95,10 +95,19 @@ const Prediction = () => {
   };
 
   const handleDateChange = (name, date) => {
-    setFormData((prev) => ({
-      ...prev,
-      [name]: date,
-    }));
+    setFormData((prev) => {
+      const updated = { ...prev, [name]: date };
+      // If scheduling date changed to after appointment date, clear appointment date
+      if (
+        name === "Marcacao" &&
+        prev.DataHoraConsulta &&
+        date &&
+        date > prev.DataHoraConsulta
+      ) {
+        updated.DataHoraConsulta = null;
+      }
+      return updated;
+    });
   };
 
   const handleCepChange = async (cep) => {
@@ -237,6 +246,10 @@ const Prediction = () => {
       address: "RUA VIEIRA DE MORAES",
       cep: "04617-015",
     },
+    "CLINICA VOE - CAMPO BELO": {
+      address: "RUA VIEIRA DE MORAES",
+      cep: "04617-015",
+    },
     "GUARUJA - AMB. IGESP": {
       address: "RUA MONTENEGRO",
       cep: "11410-040",
@@ -254,6 +267,14 @@ const Prediction = () => {
       cep: "11702-210",
     },
     "SANTANA - AMB. TRAS": {
+      address: "RUA DUARTE DE AZEVEDO",
+      cep: "02036-020",
+    },
+    "SHOP. ARICANDUVA - AMB. TRAS": {
+      address: "AV ARICANDUVA",
+      cep: "03527-000",
+    },
+    "Hospital IGESP Santana": {
       address: "RUA DUARTE DE AZEVEDO",
       cep: "02036-020",
     },
@@ -303,9 +324,9 @@ const Prediction = () => {
         throw new Error("Nenhuma consulta encontrada para processar.");
       }
 
-      if (appointments.length > 1000) {
+      if (appointments.length > 250) {
         throw new Error(
-          `Máximo de 500 consultas por lote. Você tentou processar ${appointments.length}.`,
+          `Máximo de 250 consultas por lote. Você tentou processar ${appointments.length}.`,
         );
       }
 
@@ -337,6 +358,17 @@ const Prediction = () => {
           throw new Error(
             `Registro ${index + 1}: campos obrigatórios faltando: ${missingFields.join(", ")}`,
           );
+        }
+
+        // Validate appointment date is not before scheduling date
+        if (appt.Marcacao && appt.DataHoraConsulta) {
+          const marcacao = new Date(appt.Marcacao);
+          const consulta = new Date(appt.DataHoraConsulta);
+          if (!isNaN(marcacao) && !isNaN(consulta) && consulta < marcacao) {
+            throw new Error(
+              `Registro ${index + 1}: a data da consulta (${appt.DataHoraConsulta}) não pode ser anterior à data do agendamento (${appt.Marcacao}).`,
+            );
+          }
         }
 
         // Get unit info
@@ -447,6 +479,17 @@ const Prediction = () => {
     setRiskResult(null);
 
     try {
+      // Validate that appointment date is not before scheduling date
+      if (
+        formData.Marcacao &&
+        formData.DataHoraConsulta &&
+        formData.DataHoraConsulta < formData.Marcacao
+      ) {
+        throw new Error(
+          "A data da consulta não pode ser anterior à data do agendamento.",
+        );
+      }
+
       // Get unit info
       const unitInfo = unitMapping[formData.UnidadeAtendimento] || {
         address: "AVENIDA PAULISTA",
@@ -526,20 +569,18 @@ const Prediction = () => {
     if (!batchResults) return;
     const total = batchResults.results.length;
     setSaveAllState({ saving: true, saved: 0, failed: 0, total });
-    let saved = 0;
-    let failed = 0;
-    for (const result of batchResults.results) {
-      try {
-        await appointmentService.createAppointment(
-          buildBatchItemPayload(result),
-        );
-        saved += 1;
-      } catch {
-        failed += 1;
-      }
-      setSaveAllState({ saving: true, saved, failed, total });
+    try {
+      const payloads = batchResults.results.map(buildBatchItemPayload);
+      const result = await appointmentService.createAppointmentsBatch(payloads);
+      setSaveAllState({
+        saving: false,
+        saved: result.created,
+        failed: result.failed,
+        total,
+      });
+    } catch {
+      setSaveAllState({ saving: false, saved: 0, failed: total, total });
     }
-    setSaveAllState({ saving: false, saved, failed, total });
   };
 
   const closeSaveModal = () => {
@@ -735,9 +776,16 @@ const Prediction = () => {
                         dateFormat="dd/MM/yyyy"
                         locale={ptBR}
                         placeholderText="dd/mm/aaaa"
+                        minDate={formData.Marcacao || undefined}
                         className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                         required
                       />
+                      {formData.Marcacao && !formData.DataHoraConsulta && (
+                        <p className="text-xs text-slate-500 mt-1">
+                          A data da consulta deve ser igual ou posterior à data
+                          do agendamento.
+                        </p>
+                      )}
                     </div>
 
                     {/* Idade */}
@@ -1219,7 +1267,7 @@ const Prediction = () => {
                             • Envie um arquivo CSV ou cole JSON com dados de
                             pacientes
                           </li>
-                          <li>• Máximo de 1.000 consultas por processamento</li>
+                          <li>• Máximo de 250 consultas por processamento</li>
                           <li>
                             • Campos obrigatórios: Marcacao, DataHoraConsulta,
                             Idade, Sexo, CidadePaciente, BairroPaciente,

@@ -32,7 +32,7 @@ export interface PredictionResponse {
 }
 
 export interface BatchPredictionRequest {
-  appointments: PredictionRequest[]; // Max 1000
+  appointments: PredictionRequest[]; // Max 250
 }
 
 export interface AppointmentPredictionResult {
@@ -137,6 +137,33 @@ export interface AppointmentListResponse {
   total: number;
   page: number;
   page_size: number;
+  appointments: AppointmentResponse[];
+}
+
+export interface AppointmentBatchCreate {
+  appointments: AppointmentCreate[]; // Max 250
+}
+
+export interface AppointmentBatchResponse {
+  total: number;
+  created: number;
+  failed: number;
+  appointments: AppointmentResponse[];
+}
+
+export interface FeedbackItem {
+  appointment_id: number;
+  appointment_status: "Realizado" | "Falta" | "Cancelado";
+}
+
+export interface FeedbackBatchRequest {
+  feedbacks: FeedbackItem[]; // Max 250
+}
+
+export interface FeedbackBatchResponse {
+  total: number;
+  updated: number;
+  failed: number;
   appointments: AppointmentResponse[];
 }
 
