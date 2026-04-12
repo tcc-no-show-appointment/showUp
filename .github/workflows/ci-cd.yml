@@ -28,6 +28,7 @@ jobs:
         env:
           VITE_PREDICTION_API_URL: ${{ secrets.VITE_PREDICTION_API_URL }}
           VITE_TRAINING_API_URL: ${{ secrets.VITE_TRAINING_API_URL }}
+          VITE_ENVIRONMENT: ${{ secrets.VITE_ENVIRONMENT }}
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
           repo_token: ${{ secrets.GITHUB_TOKEN }} # Used for Github integrations (i.e. PR comments)
