@@ -12,6 +12,8 @@ import type {
   AppointmentListResponse,
   AppointmentResponse,
   AppointmentCreate,
+  AppointmentBatchCreate,
+  AppointmentBatchResponse,
 } from "../types/models";
 
 interface GetAppointmentsParams {
@@ -105,10 +107,26 @@ export const updateAppointmentFeedback = async (
   return response.data;
 };
 
+/**
+ * Create multiple appointments in a single batch request.
+ * More efficient than calling createAppointment() in a loop.
+ */
+export const createAppointmentsBatch = async (
+  appointmentsData: AppointmentCreate[]
+): Promise<AppointmentBatchResponse> => {
+  const payload: AppointmentBatchCreate = { appointments: appointmentsData };
+  const response = await predictionApi.post<AppointmentBatchResponse>(
+    "/appointments/batch",
+    payload
+  );
+  return response.data;
+};
+
 export const appointmentService = {
   getAppointments,
   getAppointmentById,
   createAppointment,
+  createAppointmentsBatch,
   updateAppointmentStatus,
   updateAppointmentFeedback,
 };
