@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, forwardRef, useEffect, useRef } from "react";
 import {
   User,
   Upload,
@@ -13,6 +13,7 @@ import {
   TrendingUp,
   Save,
   X,
+  Info,
 } from "lucide-react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
@@ -25,6 +26,68 @@ import {
   sexoOptions,
 } from "../constants/predictionOptions";
 import { cepService, predictionService, appointmentService } from "../services";
+
+const applyDateMask = (raw) => {
+  // Keep only digits, max 12
+  const digits = raw.replace(/\D/g, "").slice(0, 12);
+  let result = "";
+  for (let i = 0; i < digits.length; i++) {
+    if (i === 2 || i === 4) result += "/";
+    else if (i === 8) result += " ";
+    else if (i === 10) result += ":";
+    result += digits[i];
+  }
+  return result;
+};
+
+const parseMaskedDate = (masked) => {
+  const match = masked.match(/^(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2})$/);
+  if (!match) return null;
+  const [, dd, mm, yyyy, hh, min] = match;
+  const d = new Date(+yyyy, +mm - 1, +dd, +hh, +min);
+  return isNaN(d.getTime()) ? null : d;
+};
+
+const DateMaskedInput = forwardRef(
+  (
+    { value, onChange, onClick, onBlur, onFocus, placeholder, className },
+    ref,
+  ) => {
+    const [local, setLocal] = useState(value || "");
+    const prevValue = useRef(value);
+
+    // Only sync from DatePicker when the external value actually changes (calendar pick)
+    useEffect(() => {
+      if (value !== prevValue.current) {
+        prevValue.current = value;
+        setLocal(value || "");
+      }
+    }, [value]);
+
+    const handleChange = (e) => {
+      const masked = applyDateMask(e.target.value);
+      setLocal(masked);
+      // Pass through so DatePicker fires onChangeRaw
+      onChange({ ...e, target: { ...e.target, value: masked } });
+    };
+
+    return (
+      <input
+        ref={ref}
+        type="text"
+        value={local}
+        onChange={handleChange}
+        onClick={onClick}
+        onBlur={onBlur}
+        onFocus={onFocus}
+        placeholder={placeholder}
+        className={className}
+        maxLength={16}
+        inputMode="numeric"
+      />
+    );
+  },
+);
 
 const Prediction = () => {
   const [activeTab, setActiveTab] = useState("individual");
@@ -59,6 +122,9 @@ const Prediction = () => {
   const [batchError, setBatchError] = useState("");
   const [batchResults, setBatchResults] = useState(null);
   const [saveAllState, setSaveAllState] = useState(null); // null | { saving, saved, failed, total }
+  const [formErrors, setFormErrors] = useState({});
+  const [individualSaved, setIndividualSaved] = useState(false);
+  const [savedBatchKeys, setSavedBatchKeys] = useState(new Set());
 
   // Save modal states
   const [saveModal, setSaveModal] = useState({
@@ -79,6 +145,13 @@ const Prediction = () => {
       ...prev,
       [name]: type === "checkbox" ? checked : value,
     }));
+    if (formErrors[name]) {
+      setFormErrors((prev) => {
+        const n = { ...prev };
+        delete n[name];
+        return n;
+      });
+    }
   };
 
   const handleInvalid = (e) => {
@@ -108,6 +181,13 @@ const Prediction = () => {
       }
       return updated;
     });
+    if (date && formErrors[name]) {
+      setFormErrors((prev) => {
+        const n = { ...prev };
+        delete n[name];
+        return n;
+      });
+    }
   };
 
   const handleCepChange = async (cep) => {
@@ -433,27 +513,34 @@ const Prediction = () => {
       "Paciente ID",
       "Unidade",
       "Especialidade",
+      "Data Agendamento",
       "Data Consulta",
-      "Predição",
-      "Prob. Falta (%)",
-      "Prob. Presença (%)",
+      "Predicao",
+      "Prob. Falta Normalizada (%)",
+      "Prob. Falta Bruta (%)",
+      "Prob. Presenca (%)",
     ];
 
     const rows = batchResults.results.map((result) => [
       result.appointment.idUnicoPaciente,
       result.appointment.UnidadeAtendimento,
       result.appointment.Especialidade,
+      new Date(result.appointment.Marcacao).toLocaleDateString("pt-BR"),
       new Date(result.appointment.DataHoraConsulta).toLocaleDateString("pt-BR"),
-      result.prediction_label === "no-show" ? "Falta" : "Presença",
+      result.prediction_label === "no-show" ? "Falta" : "Presenca",
+      (result.probability_no_show_normalized * 100).toFixed(2),
       (result.probability_no_show * 100).toFixed(2),
       (result.probability_show * 100).toFixed(2),
     ]);
 
-    // Build CSV
-    const csvContent = [
-      headers.join(","),
-      ...rows.map((row) => row.map((cell) => `"${cell}"`).join(",")),
-    ].join("\n");
+    // Build CSV (BOM ensures correct UTF-8 rendering in Excel)
+    const BOM = "\uFEFF";
+    const csvContent =
+      BOM +
+      [
+        headers.join(","),
+        ...rows.map((row) => row.map((cell) => `"${cell}"`).join(",")),
+      ].join("\n");
 
     // Download
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
@@ -474,9 +561,28 @@ const Prediction = () => {
 
   const handleCalculateRisk = async (e) => {
     e.preventDefault();
+    setRiskResult(null);
+    setIndividualSaved(false);
+
+    // Client-side validation for date/required fields
+    const errors = {};
+    if (!formData.Marcacao) errors.Marcacao = true;
+    if (!formData.DataHoraConsulta) errors.DataHoraConsulta = true;
+    if (!formData.Idade) errors.Idade = true;
+    if (!formData.Sexo) errors.Sexo = true;
+    if (!formData.CidadePaciente) errors.CidadePaciente = true;
+    if (!formData.BairroPaciente) errors.BairroPaciente = true;
+    if (!formData.TipoConvenio) errors.TipoConvenio = true;
+    if (!formData.UnidadeAtendimento) errors.UnidadeAtendimento = true;
+    if (!formData.Especialidade) errors.Especialidade = true;
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+    setFormErrors({});
+
     setPredictionLoading(true);
     setPredictionError("");
-    setRiskResult(null);
 
     try {
       // Validate that appointment date is not before scheduling date
@@ -523,45 +629,53 @@ const Prediction = () => {
       const probabilityShowPercent = parseFloat(
         (result.probability_show * 100).toFixed(1),
       );
+      const probabilityNoShowNormalizedPercent = parseFloat(
+        (result.probability_no_show_normalized * 100).toFixed(1),
+      );
 
       setRiskResult({
-        risk: probabilityNoShowPercent,
+        risk: probabilityNoShowNormalizedPercent,
         level:
-          probabilityNoShowPercent > 70
+          probabilityNoShowNormalizedPercent > 70
             ? "High"
-            : probabilityNoShowPercent > 40
+            : probabilityNoShowNormalizedPercent > 40
               ? "Medium"
               : "Low",
         color:
-          probabilityNoShowPercent > 70
+          probabilityNoShowNormalizedPercent > 70
             ? "red"
-            : probabilityNoShowPercent > 40
+            : probabilityNoShowNormalizedPercent > 40
               ? "yellow"
               : "green",
         prediction: result.prediction,
         predictionLabel: result.prediction_label,
         probabilityShow: probabilityShowPercent,
         probabilityNoShow: probabilityNoShowPercent,
+        probabilityNoShowNormalized: probabilityNoShowNormalizedPercent,
       });
     } catch (error) {
       console.error("Prediction error:", error);
+      const status = error.response?.status;
       setPredictionError(
-        error.response?.data?.detail ||
-          error.message ||
-          "Erro ao calcular predição. Tente novamente.",
+        status && status >= 500
+          ? "Erro interno no servidor. Tente novamente em alguns instantes ou entre em contato com o suporte."
+          : error.response?.data?.detail ||
+              error.message ||
+              "Erro ao calcular predição. Tente novamente.",
       );
     } finally {
       setPredictionLoading(false);
     }
   };
 
-  const openSaveModal = (appointmentPayload) => {
+  const openSaveModal = (appointmentPayload, batchIndex = null) => {
     setSaveModal({
       open: true,
       data: appointmentPayload,
       saving: false,
       savedId: null,
       error: "",
+      batchIndex,
     });
   };
 
@@ -578,6 +692,9 @@ const Prediction = () => {
         failed: result.failed,
         total,
       });
+      if (result.failed === 0) {
+        setSavedBatchKeys(new Set(batchResults.results.map((_, i) => i)));
+      }
     } catch {
       setSaveAllState({ saving: false, saved: 0, failed: total, total });
     }
@@ -599,11 +716,17 @@ const Prediction = () => {
       const created = await appointmentService.createAppointment(
         saveModal.data,
       );
+      const savedId = created.appointment_prediction_id;
       setSaveModal((prev) => ({
         ...prev,
         saving: false,
-        savedId: created.appointment_prediction_id,
+        savedId,
       }));
+      if (saveModal.batchIndex != null) {
+        setSavedBatchKeys((prev) => new Set([...prev, saveModal.batchIndex]));
+      } else {
+        setIndividualSaved(true);
+      }
     } catch (error) {
       setSaveModal((prev) => ({
         ...prev,
@@ -640,6 +763,9 @@ const Prediction = () => {
       probability_no_show: riskResult
         ? riskResult.probabilityNoShow / 100
         : null,
+      probability_no_show_normalized: riskResult
+        ? riskResult.probabilityNoShowNormalized / 100
+        : null,
     };
   };
 
@@ -666,6 +792,7 @@ const Prediction = () => {
       prediction_label: result.prediction_label,
       probability_show: result.probability_show,
       probability_no_show: result.probability_no_show,
+      probability_no_show_normalized: result.probability_no_show_normalized,
     };
   };
 
@@ -747,76 +874,155 @@ const Prediction = () => {
                       </select>
                     </div> */}
 
+                    {/* idUnicoPaciente */}
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        ID Único do Paciente{" "}
+                        <span className="text-slate-400 font-normal text-xs">
+                          (opcional)
+                        </span>
+                      </label>
+                      <input
+                        type="text"
+                        name="idUnicoPaciente"
+                        value={formData.idUnicoPaciente}
+                        onChange={handleInputChange}
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                        placeholder="Digite o ID do paciente (opcional)"
+                      />
+                    </div>
+
                     {/* Marcacao */}
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-2">
-                        Data do Agendamento
+                        Data do Agendamento{" "}
+                        <span className="text-red-500">*</span>
                       </label>
                       <DatePicker
                         selected={formData.Marcacao}
                         onChange={(date) => handleDateChange("Marcacao", date)}
-                        dateFormat="dd/MM/yyyy"
+                        onChangeRaw={(e) => {
+                          const parsed = parseMaskedDate(
+                            e?.target?.value || "",
+                          );
+                          if (parsed) handleDateChange("Marcacao", parsed);
+                        }}
+                        dateFormat="dd/MM/yyyy HH:mm"
+                        timeFormat="HH:mm"
+                        timeIntervals={15}
+                        timeCaption="Hora"
+                        showTimeSelect
                         locale={ptBR}
-                        placeholderText="dd/mm/aaaa"
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                        required
+                        placeholderText="dd/mm/aaaa hh:mm"
+                        customInput={
+                          <DateMaskedInput
+                            className={`w-full px-4 py-2 border rounded-lg focus:ring-2 outline-none transition-all ${
+                              formErrors.Marcacao
+                                ? "border-red-400 focus:ring-red-400 focus:border-red-400"
+                                : "border-slate-300 focus:ring-blue-500 focus:border-blue-500"
+                            }`}
+                          />
+                        }
                       />
+                      {formErrors.Marcacao && (
+                        <p className="text-xs text-red-500 mt-1">
+                          Campo obrigatório
+                        </p>
+                      )}
                     </div>
 
                     {/* DataHoraConsulta */}
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-2">
-                        Data da Consulta
+                        Data da Consulta <span className="text-red-500">*</span>
                       </label>
                       <DatePicker
                         selected={formData.DataHoraConsulta}
                         onChange={(date) =>
                           handleDateChange("DataHoraConsulta", date)
                         }
-                        dateFormat="dd/MM/yyyy"
+                        onChangeRaw={(e) => {
+                          const parsed = parseMaskedDate(
+                            e?.target?.value || "",
+                          );
+                          if (parsed)
+                            handleDateChange("DataHoraConsulta", parsed);
+                        }}
+                        dateFormat="dd/MM/yyyy HH:mm"
+                        timeFormat="HH:mm"
+                        timeIntervals={15}
+                        timeCaption="Hora"
+                        showTimeSelect
                         locale={ptBR}
-                        placeholderText="dd/mm/aaaa"
+                        placeholderText="dd/mm/aaaa hh:mm"
                         minDate={formData.Marcacao || undefined}
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                        required
+                        customInput={
+                          <DateMaskedInput
+                            className={`w-full px-4 py-2 border rounded-lg focus:ring-2 outline-none transition-all ${
+                              formErrors.DataHoraConsulta
+                                ? "border-red-400 focus:ring-red-400 focus:border-red-400"
+                                : "border-slate-300 focus:ring-blue-500 focus:border-blue-500"
+                            }`}
+                          />
+                        }
                       />
-                      {formData.Marcacao && !formData.DataHoraConsulta && (
-                        <p className="text-xs text-slate-500 mt-1">
-                          A data da consulta deve ser igual ou posterior à data
-                          do agendamento.
+                      {formErrors.DataHoraConsulta && (
+                        <p className="text-xs text-red-500 mt-1">
+                          Campo obrigatório
                         </p>
                       )}
+                      {formData.Marcacao &&
+                        !formData.DataHoraConsulta &&
+                        !formErrors.DataHoraConsulta && (
+                          <p className="text-xs text-red-500 mt-1">
+                            A data da consulta deve ser igual ou posterior à
+                            data do agendamento.
+                          </p>
+                        )}
                     </div>
 
                     {/* Idade */}
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-2">
-                        Idade
+                        Idade <span className="text-red-500">*</span>
                       </label>
                       <input
                         type="number"
                         name="Idade"
                         value={formData.Idade}
                         onChange={handleInputChange}
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 outline-none transition-all ${
+                          formErrors.Idade
+                            ? "border-red-400 focus:ring-red-400 focus:border-red-400"
+                            : "border-slate-300 focus:ring-blue-500 focus:border-blue-500"
+                        }`}
                         placeholder="Digite a idade"
                         min="0"
                         max="120"
                         required
                       />
+                      {formErrors.Idade && (
+                        <p className="text-xs text-red-500 mt-1">
+                          Campo obrigatório
+                        </p>
+                      )}
                     </div>
 
                     {/* Sexo */}
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-2">
-                        Sexo
+                        Sexo <span className="text-red-500">*</span>
                       </label>
                       <select
                         name="Sexo"
                         value={formData.Sexo}
                         onChange={handleInputChange}
                         onInvalid={handleInvalid}
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 outline-none transition-all ${
+                          formErrors.Sexo
+                            ? "border-red-400 focus:ring-red-400 focus:border-red-400"
+                            : "border-slate-300 focus:ring-blue-500 focus:border-blue-500"
+                        }`}
                         required
                       >
                         <option value="">Selecione...</option>
@@ -826,12 +1032,17 @@ const Prediction = () => {
                           </option>
                         ))}
                       </select>
+                      {formErrors.Sexo && (
+                        <p className="text-xs text-red-500 mt-1">
+                          Campo obrigatório
+                        </p>
+                      )}
                     </div>
 
                     {/* CEP Paciente */}
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-2">
-                        CEP do Paciente
+                        CEP do Paciente <span className="text-red-500">*</span>
                       </label>
                       <div className="relative">
                         <input
@@ -864,48 +1075,72 @@ const Prediction = () => {
                     {/* CidadePaciente */}
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-2">
-                        Cidade do Paciente
+                        Cidade do Paciente{" "}
+                        <span className="text-red-500">*</span>
                       </label>
                       <input
                         type="text"
                         name="CidadePaciente"
                         value={formData.CidadePaciente}
                         onChange={handleInputChange}
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all disabled:bg-slate-100 disabled:text-slate-600 disabled:cursor-not-allowed"
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 outline-none transition-all disabled:bg-slate-100 disabled:text-slate-600 disabled:cursor-not-allowed ${
+                          formErrors.CidadePaciente && !cepAutoFilled
+                            ? "border-red-400 focus:ring-red-400 focus:border-red-400"
+                            : "border-slate-300 focus:ring-blue-500 focus:border-blue-500"
+                        }`}
                         placeholder="Digite a cidade ou preencha o CEP"
                         required
                         disabled={cepAutoFilled}
                       />
+                      {formErrors.CidadePaciente && !cepAutoFilled && (
+                        <p className="text-xs text-red-500 mt-1">
+                          Campo obrigatório
+                        </p>
+                      )}
                     </div>
 
                     {/* BairroPaciente */}
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-2">
-                        Bairro do Paciente
+                        Bairro do Paciente{" "}
+                        <span className="text-red-500">*</span>
                       </label>
                       <input
                         type="text"
                         name="BairroPaciente"
                         value={formData.BairroPaciente}
                         onChange={handleInputChange}
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all disabled:bg-slate-100 disabled:text-slate-600 disabled:cursor-not-allowed"
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 outline-none transition-all disabled:bg-slate-100 disabled:text-slate-600 disabled:cursor-not-allowed ${
+                          formErrors.BairroPaciente && !cepAutoFilled
+                            ? "border-red-400 focus:ring-red-400 focus:border-red-400"
+                            : "border-slate-300 focus:ring-blue-500 focus:border-blue-500"
+                        }`}
                         placeholder="Digite o bairro ou preencha o CEP"
                         required
                         disabled={cepAutoFilled}
                       />
+                      {formErrors.BairroPaciente && !cepAutoFilled && (
+                        <p className="text-xs text-red-500 mt-1">
+                          Campo obrigatório
+                        </p>
+                      )}
                     </div>
 
                     {/* TipoConvenio */}
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-2">
-                        Tipo de Convênio
+                        Tipo de Convênio <span className="text-red-500">*</span>
                       </label>
                       <select
                         name="TipoConvenio"
                         value={formData.TipoConvenio}
                         onChange={handleInputChange}
                         onInvalid={handleInvalid}
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 outline-none transition-all ${
+                          formErrors.TipoConvenio
+                            ? "border-red-400 focus:ring-red-400 focus:border-red-400"
+                            : "border-slate-300 focus:ring-blue-500 focus:border-blue-500"
+                        }`}
                         required
                       >
                         <option value="">Selecione...</option>
@@ -915,37 +1150,29 @@ const Prediction = () => {
                           </option>
                         ))}
                       </select>
-                    </div>
-
-                    {/* idUnicoPaciente */}
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">
-                        ID Único do Paciente{" "}
-                        <span className="text-slate-400 font-normal text-xs">
-                          (opcional)
-                        </span>
-                      </label>
-                      <input
-                        type="text"
-                        name="idUnicoPaciente"
-                        value={formData.idUnicoPaciente}
-                        onChange={handleInputChange}
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                        placeholder="Digite o ID do paciente (opcional)"
-                      />
+                      {formErrors.TipoConvenio && (
+                        <p className="text-xs text-red-500 mt-1">
+                          Campo obrigatório
+                        </p>
+                      )}
                     </div>
 
                     {/* UnidadeAtendimento */}
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-2">
-                        Unidade de Atendimento
+                        Unidade de Atendimento{" "}
+                        <span className="text-red-500">*</span>
                       </label>
                       <select
                         name="UnidadeAtendimento"
                         value={formData.UnidadeAtendimento}
                         onChange={handleInputChange}
                         onInvalid={handleInvalid}
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 outline-none transition-all ${
+                          formErrors.UnidadeAtendimento
+                            ? "border-red-400 focus:ring-red-400 focus:border-red-400"
+                            : "border-slate-300 focus:ring-blue-500 focus:border-blue-500"
+                        }`}
                         required
                       >
                         <option value="">Selecione...</option>
@@ -955,19 +1182,28 @@ const Prediction = () => {
                           </option>
                         ))}
                       </select>
+                      {formErrors.UnidadeAtendimento && (
+                        <p className="text-xs text-red-500 mt-1">
+                          Campo obrigatório
+                        </p>
+                      )}
                     </div>
 
                     {/* Especialidade */}
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-2">
-                        Especialidade
+                        Especialidade <span className="text-red-500">*</span>
                       </label>
                       <select
                         name="Especialidade"
                         value={formData.Especialidade}
                         onChange={handleInputChange}
                         onInvalid={handleInvalid}
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 outline-none transition-all ${
+                          formErrors.Especialidade
+                            ? "border-red-400 focus:ring-red-400 focus:border-red-400"
+                            : "border-slate-300 focus:ring-blue-500 focus:border-blue-500"
+                        }`}
                         required
                       >
                         <option value="">Selecione...</option>
@@ -977,6 +1213,11 @@ const Prediction = () => {
                           </option>
                         ))}
                       </select>
+                      {formErrors.Especialidade && (
+                        <p className="text-xs text-red-500 mt-1">
+                          Campo obrigatório
+                        </p>
+                      )}
                     </div>
                   </div>
 
@@ -1050,9 +1291,37 @@ const Prediction = () => {
 
                       {/* Risk Score */}
                       <div className="text-center">
-                        <p className="text-sm text-slate-600 mb-2">
-                          Probabilidade de Falta
-                        </p>
+                        <div className="relative group inline-flex items-center justify-center gap-1 mb-2">
+                          <p className="text-sm text-slate-600">
+                            Probabilidade de Falta
+                          </p>
+                          <Info className="w-3.5 h-3.5 text-slate-400 cursor-help flex-shrink-0" />
+                          <div className="invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-opacity absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-slate-800 text-white text-xs rounded-lg p-3 z-20 text-left pointer-events-none">
+                            <p className="font-semibold mb-1">
+                              Valor normalizado
+                            </p>
+                            <p className="text-slate-300">
+                              Este valor é ajustado para que 50% sempre
+                              represente o limiar de decisão, independente da
+                              especialidade. Facilita a comparação entre
+                              especialidades.
+                            </p>
+                            <p className="mt-1.5 text-slate-400">
+                              Probabilidade bruta:{" "}
+                              <span className="text-white font-medium">
+                                {riskResult.probabilityNoShow.toLocaleString(
+                                  "pt-BR",
+                                  {
+                                    minimumFractionDigits: 1,
+                                    maximumFractionDigits: 1,
+                                  },
+                                )}
+                                %
+                              </span>
+                            </p>
+                            <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800" />
+                          </div>
+                        </div>
                         <p className="text-4xl font-bold text-slate-800">
                           {riskResult.risk.toLocaleString("pt-BR", {
                             minimumFractionDigits: 1,
@@ -1079,8 +1348,28 @@ const Prediction = () => {
                             %
                           </span>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-slate-600">Prob. Falta:</span>
+                        <div className="flex justify-between items-center">
+                          <div className="relative group inline-flex items-center gap-1">
+                            <span className="text-slate-600">Prob. Falta:</span>
+                            <Info className="w-3 h-3 text-slate-400 cursor-help" />
+                            <div className="invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-opacity absolute bottom-full left-0 mb-2 w-56 bg-slate-800 text-white text-xs rounded-lg p-2.5 z-20 pointer-events-none">
+                              <p className="text-slate-300">
+                                Normalizado pelo limiar da especialidade (50% =
+                                limiar). Bruto:{" "}
+                                <span className="text-white font-medium">
+                                  {riskResult.probabilityNoShow.toLocaleString(
+                                    "pt-BR",
+                                    {
+                                      minimumFractionDigits: 1,
+                                      maximumFractionDigits: 1,
+                                    },
+                                  )}
+                                  %
+                                </span>
+                              </p>
+                              <div className="absolute top-full left-4 border-4 border-transparent border-t-slate-800" />
+                            </div>
+                          </div>
                           <span className="font-semibold text-red-600">
                             {riskResult.risk.toLocaleString("pt-BR", {
                               minimumFractionDigits: 1,
@@ -1126,15 +1415,22 @@ const Prediction = () => {
                           Esta predição é baseada em análise de IA dos dados do
                           paciente e padrões históricos.
                         </p>
-                        <button
-                          onClick={() =>
-                            openSaveModal(buildIndividualPayload())
-                          }
-                          className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors text-sm"
-                        >
-                          <Save className="w-4 h-4" />
-                          Salvar Consulta
-                        </button>
+                        {!individualSaved ? (
+                          <button
+                            onClick={() =>
+                              openSaveModal(buildIndividualPayload())
+                            }
+                            className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                          >
+                            <Save className="w-4 h-4" />
+                            Salvar Consulta
+                          </button>
+                        ) : (
+                          <div className="w-full flex items-center justify-center gap-2 bg-green-50 border border-green-200 text-green-700 font-semibold py-2 px-4 rounded-lg text-sm">
+                            <CheckCircle className="w-4 h-4" />
+                            Consulta salva
+                          </div>
+                        )}
                       </div>
                     </div>
                   ) : (
@@ -1480,19 +1776,53 @@ const Prediction = () => {
                                   )}
                                 </span>
                               </td>
-                              <td className="px-4 py-3 text-right font-semibold text-slate-700">
-                                {(result.probability_no_show * 100).toFixed(1)}%
+                              <td className="px-4 py-3 text-right">
+                                <div className="relative group inline-flex items-center justify-end gap-1">
+                                  <span className="font-semibold text-slate-700">
+                                    {(
+                                      result.probability_no_show_normalized *
+                                      100
+                                    ).toFixed(1)}
+                                    %
+                                  </span>
+                                  <Info className="w-3 h-3 text-slate-400 cursor-help flex-shrink-0" />
+                                  <div className="invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-opacity absolute bottom-full right-0 mb-2 w-56 bg-slate-800 text-white text-xs rounded-lg p-2.5 z-20 text-left pointer-events-none">
+                                    <p className="font-semibold mb-1">
+                                      Valor normalizado
+                                    </p>
+                                    <p className="text-slate-300">
+                                      50% = limiar da especialidade. Bruto:{" "}
+                                      <span className="text-white font-medium">
+                                        {(
+                                          result.probability_no_show * 100
+                                        ).toFixed(1)}
+                                        %
+                                      </span>
+                                    </p>
+                                    <div className="absolute top-full right-3 border-4 border-transparent border-t-slate-800" />
+                                  </div>
+                                </div>
                               </td>
                               <td className="px-4 py-3 text-center">
-                                <button
-                                  onClick={() =>
-                                    openSaveModal(buildBatchItemPayload(result))
-                                  }
-                                  className="inline-flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-semibold bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors"
-                                >
-                                  <Save className="w-3 h-3" />
-                                  Salvar
-                                </button>
+                                {savedBatchKeys.has(index) ? (
+                                  <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-green-700">
+                                    <CheckCircle className="w-3 h-3" />
+                                    Salvo
+                                  </span>
+                                ) : (
+                                  <button
+                                    onClick={() =>
+                                      openSaveModal(
+                                        buildBatchItemPayload(result),
+                                        index,
+                                      )
+                                    }
+                                    className="inline-flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-semibold bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors"
+                                  >
+                                    <Save className="w-3 h-3" />
+                                    Salvar
+                                  </button>
+                                )}
                               </td>
                             </tr>
                           ))}

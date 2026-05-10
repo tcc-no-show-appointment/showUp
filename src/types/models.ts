@@ -29,6 +29,7 @@ export interface PredictionResponse {
   prediction_label: "show" | "no-show";
   probability_show: number;
   probability_no_show: number;
+  probability_no_show_normalized: number;
 }
 
 export interface BatchPredictionRequest {
@@ -41,6 +42,7 @@ export interface AppointmentPredictionResult {
   prediction_label: "show" | "no-show";
   probability_show: number;
   probability_no_show: number;
+  probability_no_show_normalized: number;
 }
 
 export interface BatchPredictionResponse {
@@ -60,6 +62,7 @@ export interface DatePrediction {
   prediction: 0 | 1;
   prediction_label: "show" | "no-show";
   probability_no_show: number;
+  probability_no_show_normalized: number;
   probability_show: number;
 }
 
@@ -103,6 +106,7 @@ export interface AppointmentCreate {
   prediction_label?: "show" | "no-show";
   probability_show?: number;
   probability_no_show?: number;
+  probability_no_show_normalized?: number;
 }
 
 export interface AppointmentStatusUpdate {
@@ -129,6 +133,7 @@ export interface AppointmentResponse {
   prediction_label: string | null;
   probability_show: number | null;
   probability_no_show: number | null;
+  probability_no_show_normalized: number | null;
   created_at: string;
   updated_at: string | null;
 }
@@ -192,6 +197,46 @@ export interface ValidationResponse {
   warnings: string[] | null;
 }
 
+export interface TrainingJobAccepted {
+  job_id: string;
+  status: "pending";
+  message: string;
+  status_url: string;
+  timestamp: string;
+}
+
+export interface TrainingSpecialtyMetrics {
+  accuracy: number | null;
+  precision: number | null;
+  recall: number | null;
+  f1_score: number | null;
+  roc_auc: number | null;
+  pr_auc: number | null;
+  threshold: number | null;
+  training_time_seconds: number | null;
+  dataset_rows?: number | null;
+}
+
+export interface TrainingJobResult {
+  status: "success";
+  message: string;
+  specialties_trained: string[];
+  blob_urls: Record<string, string> | null;
+  metrics: Record<string, TrainingSpecialtyMetrics>;
+  thresholds: Record<string, number>;
+  training_time_seconds: number;
+}
+
+export interface TrainingJobStatus {
+  job_id: string;
+  status: "pending" | "running" | "success" | "failed";
+  result: TrainingJobResult | null;
+  error: string | null;
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+}
+
 // ============================================================================
 // TRAINING API — Health & Model History
 // ============================================================================
@@ -208,11 +253,14 @@ export interface ModelHistoryResponse {
   model_version: string | null;
   blob_url: string | null;
   environment: string | null;
+  specialty_group: string | null;
   accuracy: number | null;
   precision: number | null;
   recall: number | null;
   f1_score: number | null;
   roc_auc: number | null;
+  pr_auc: number | null;
+  threshold: number | null;
   training_time_seconds: number | null;
   dataset_rows: number | null;
   dataset_columns: number | null;

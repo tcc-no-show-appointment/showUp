@@ -12,6 +12,7 @@ import {
   ShieldAlert,
   Clock,
   FileDown,
+  Info,
 } from "lucide-react";
 import {
   AreaChart,
@@ -28,7 +29,16 @@ import {
 } from "recharts";
 import { appointmentService } from "../services";
 
-const DAYS_PT = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+const getLast30Days = () => {
+  const days = [];
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    d.setHours(0, 0, 0, 0);
+    days.push(d);
+  }
+  return days;
+};
 
 const isSameDay = (dateStr, target) => {
   const d = new Date(dateStr);
@@ -37,17 +47,6 @@ const isSameDay = (dateStr, target) => {
     d.getMonth() === target.getMonth() &&
     d.getDate() === target.getDate()
   );
-};
-
-const getLast7Days = () => {
-  const days = [];
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    d.setHours(0, 0, 0, 0);
-    days.push(d);
-  }
-  return days;
 };
 
 const Dashboard = () => {
@@ -99,7 +98,7 @@ const Dashboard = () => {
     try {
       const data = await appointmentService.getAppointments({
         page: 1,
-        pageSize: 100,
+        pageSize: 500,
       });
       setAppointments(data.appointments);
       setTotal(data.total);
@@ -128,10 +127,12 @@ const Dashboard = () => {
     (a) => a.created_at && isSameDay(a.created_at, today),
   ).length;
 
-  const withRisk = appointments.filter((a) => a.probability_no_show != null);
+  const withRisk = appointments.filter(
+    (a) => a.probability_no_show_normalized != null,
+  );
   const avgRisk =
     withRisk.length > 0
-      ? withRisk.reduce((sum, a) => sum + a.probability_no_show, 0) /
+      ? withRisk.reduce((sum, a) => sum + a.probability_no_show_normalized, 0) /
         withRisk.length
       : null;
 
@@ -176,7 +177,7 @@ const Dashboard = () => {
   // ── Pending high-risk appointments ──
   const pending = appointments.filter((a) => !a.appointment_status);
   const highRiskPending = pending.filter(
-    (a) => a.probability_no_show > 0.7,
+    (a) => a.probability_no_show_normalized > 0.7,
   ).length;
 
   // ── Specialty breakdown (predicted no-show rate per specialty) ──
@@ -198,13 +199,14 @@ const Dashboard = () => {
     .sort((a, b) => b.rate - a.rate)
     .slice(0, 8);
 
-  const last7Days = getLast7Days();
-  const chartData = last7Days.map((day) => {
+  const last30Days = getLast30Days();
+  const chartData = last30Days.map((day) => {
     const dayAppts = appointments.filter(
       (a) => a.created_at && isSameDay(a.created_at, day),
     );
+    const label = `${String(day.getDate()).padStart(2, "0")}/${String(day.getMonth() + 1).padStart(2, "0")}`;
     return {
-      day: DAYS_PT[day.getDay()],
+      day: label,
       presenca: dayAppts.filter((a) => a.prediction_class === 0).length,
       falta: dayAppts.filter((a) => a.prediction_class === 1).length,
     };
@@ -309,6 +311,34 @@ const Dashboard = () => {
         </div>
       </div>
 
+      {/* Data scope banner */}
+      {!loading && !error && (
+        <div className="flex items-center gap-2 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 mb-6 text-sm text-blue-700">
+          <Info className="w-4 h-4 shrink-0" />
+          <span>
+            Todos os cards e gráficos utilizam os{" "}
+            <strong>{appointments.length.toLocaleString("pt-BR")}</strong>{" "}
+            registros mais recentes carregados
+            {total > appointments.length ? (
+              <>
+                {" "}
+                de um total de <strong>
+                  {total.toLocaleString("pt-BR")}
+                </strong>{" "}
+                no banco
+              </>
+            ) : (
+              <>
+                {" "}
+                (total no banco:{" "}
+                <strong>{total.toLocaleString("pt-BR")}</strong>)
+              </>
+            )}
+            . Todo o período de tempo é considerado.
+          </span>
+        </div>
+      )}
+
       {/* Error */}
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6 flex gap-3">
@@ -398,7 +428,7 @@ const Dashboard = () => {
         <div className="lg:col-span-2 bg-white rounded-xl shadow-sm p-6 border border-slate-200">
           <div className="mb-6">
             <h2 className="text-xl font-bold text-slate-800 mb-1">
-              Predições dos Últimos 7 Dias
+              Predições dos Últimos 30 Dias
             </h2>
             <p className="text-sm text-slate-500">
               Previsões de presença e falta por dia (consultas salvas)
@@ -434,7 +464,8 @@ const Dashboard = () => {
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                 <XAxis
                   dataKey="day"
-                  tick={{ fill: "#64748b", fontSize: 12 }}
+                  tick={{ fill: "#64748b", fontSize: 10 }}
+                  interval={4}
                   axisLine={{ stroke: "#e2e8f0" }}
                 />
                 <YAxis
