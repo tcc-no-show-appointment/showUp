@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { LayoutDashboard, BrainCircuit, ListTodo, LucideIcon } from "lucide-react";
+import { LayoutDashboard, BrainCircuit, ListTodo, Cpu, LucideIcon } from "lucide-react";
 import { ShowUpLogo } from "../assets";
 
 interface NavItem {
@@ -25,6 +25,11 @@ const Sidebar: React.FC = () => {
       path: "/appointments",
       icon: ListTodo,
     },
+    {
+      name: "Treinamento",
+      path: "/training",
+      icon: Cpu,
+    },
   ];
 
   return (
@@ -39,7 +44,7 @@ const Sidebar: React.FC = () => {
           />
           <div>
             <h1 className="text-xl font-bold bg-brand-gradient bg-clip-text text-transparent">
-              Show-Up
+              ShowUp
             </h1>
             <p className="text-xs text-slate-500">Preditor IA de Ausências</p>
           </div>
