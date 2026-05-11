@@ -25,11 +25,12 @@ export interface PredictionRequest {
 }
 
 export interface PredictionResponse {
-  prediction: 0 | 1; // 0 = Show, 1 = No-Show
+  prediction: 0 | 1;
   prediction_label: "show" | "no-show";
   probability_show: number;
   probability_no_show: number;
   probability_no_show_normalized: number;
+  threshold: number;
 }
 
 export interface BatchPredictionRequest {
@@ -43,6 +44,7 @@ export interface AppointmentPredictionResult {
   probability_show: number;
   probability_no_show: number;
   probability_no_show_normalized: number;
+  threshold: number;
 }
 
 export interface BatchPredictionResponse {
@@ -58,12 +60,13 @@ export interface RangePredictionRequest {
 }
 
 export interface DatePrediction {
-  date: string; // YYYY-MM-DD
+  date: string;
   prediction: 0 | 1;
   prediction_label: "show" | "no-show";
   probability_no_show: number;
   probability_no_show_normalized: number;
   probability_show: number;
+  threshold: number;
 }
 
 export interface RangePredictionSummary {

@@ -151,7 +151,7 @@ const SpecialtyMetricsSection = ({ specialty, metrics, threshold }) => {
       color: "bg-slate-100 text-slate-600",
     },
     {
-      label: "Tempo de Treino",
+      label: "Tempo de treino",
       value: fmtSeconds(metrics?.training_time_seconds),
       icon: Clock,
       color: "bg-sky-100 text-sky-600",
@@ -1138,7 +1138,7 @@ const Training = () => {
                   ) : (
                     <RefreshCw className="w-4 h-4" />
                   )}
-                  {triggering ? "Iniciando…" : "Iniciar Retreinamento"}
+                  {triggering ? "Iniciando…" : "Iniciar retreinamento"}
                 </button>
               </div>
             )}
@@ -1236,7 +1236,7 @@ const Training = () => {
                     ) : (
                       <Upload className="w-4 h-4" />
                     )}
-                    {triggering ? "Iniciando…" : "Iniciar Treinamento"}
+                    {triggering ? "Iniciando…" : "Iniciar treinamento"}
                   </button>
                 )}
               </div>

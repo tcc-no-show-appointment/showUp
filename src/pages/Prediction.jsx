@@ -513,8 +513,8 @@ const Prediction = () => {
       "Paciente ID",
       "Unidade",
       "Especialidade",
-      "Data Agendamento",
-      "Data Consulta",
+      "Data agendamento",
+      "Data consulta",
       "Predicao",
       "Prob. Falta Normalizada (%)",
       "Prob. Falta Bruta (%)",
@@ -652,6 +652,7 @@ const Prediction = () => {
         probabilityShow: probabilityShowPercent,
         probabilityNoShow: probabilityNoShowPercent,
         probabilityNoShowNormalized: probabilityNoShowNormalizedPercent,
+        threshold: result.threshold,
       });
     } catch (error) {
       console.error("Prediction error:", error);
@@ -1252,7 +1253,7 @@ const Prediction = () => {
                     ) : (
                       <>
                         <Brain className="w-5 h-5" />
-                        Calcular Risco
+                        Calcular risco
                       </>
                     )}
                   </button>
@@ -1263,7 +1264,7 @@ const Prediction = () => {
               <div className="lg:col-span-1">
                 <div className="bg-slate-50 rounded-xl p-6 border border-slate-200 sticky top-8">
                   <h3 className="text-lg font-bold text-slate-800 mb-4">
-                    Resultado da Predição
+                    Resultado da predição
                   </h3>
 
                   {riskResult ? (
@@ -1293,7 +1294,7 @@ const Prediction = () => {
                       <div className="text-center">
                         <div className="relative group inline-flex items-center justify-center gap-1 mb-2">
                           <p className="text-sm text-slate-600">
-                            Probabilidade de Falta
+                            Probabilidade de falta
                           </p>
                           <Info className="w-3.5 h-3.5 text-slate-400 cursor-help flex-shrink-0" />
                           <div className="invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-opacity absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-slate-800 text-white text-xs rounded-lg p-3 z-20 text-left pointer-events-none">
@@ -1301,12 +1302,25 @@ const Prediction = () => {
                               Valor normalizado
                             </p>
                             <p className="text-slate-300">
-                              Este valor é ajustado para que 50% sempre
-                              represente o limiar de decisão, independente da
-                              especialidade. Facilita a comparação entre
+                              Ajustado para que 50% sempre represente o limiar
+                              desta especialidade. Facilita a comparação entre
                               especialidades.
                             </p>
                             <p className="mt-1.5 text-slate-400">
+                              Limiar da especialidade:{" "}
+                              <span className="text-white font-medium">
+                                {riskResult.threshold != null
+                                  ? (riskResult.threshold * 100).toLocaleString(
+                                      "pt-BR",
+                                      {
+                                        minimumFractionDigits: 0,
+                                        maximumFractionDigits: 1,
+                                      },
+                                    ) + "%"
+                                  : "—"}
+                              </span>
+                            </p>
+                            <p className="mt-0.5 text-slate-400">
                               Probabilidade bruta:{" "}
                               <span className="text-white font-medium">
                                 {riskResult.probabilityNoShow.toLocaleString(
@@ -1335,27 +1349,42 @@ const Prediction = () => {
                       <div className="space-y-2 text-sm">
                         <div className="flex justify-between">
                           <span className="text-slate-600">
-                            Prob. Presença:
+                            Prob. presença:
                           </span>
                           <span className="font-semibold text-green-600">
-                            {riskResult.probabilityShow.toLocaleString(
-                              "pt-BR",
-                              {
-                                minimumFractionDigits: 1,
-                                maximumFractionDigits: 1,
-                              },
-                            )}
+                            {(100 - riskResult.risk).toLocaleString("pt-BR", {
+                              minimumFractionDigits: 1,
+                              maximumFractionDigits: 1,
+                            })}
                             %
                           </span>
                         </div>
                         <div className="flex justify-between items-center">
                           <div className="relative group inline-flex items-center gap-1">
-                            <span className="text-slate-600">Prob. Falta:</span>
+                            <span className="text-slate-600">Prob. falta:</span>
                             <Info className="w-3 h-3 text-slate-400 cursor-help" />
-                            <div className="invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-opacity absolute bottom-full left-0 mb-2 w-56 bg-slate-800 text-white text-xs rounded-lg p-2.5 z-20 pointer-events-none">
+                            <div className="invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-opacity absolute bottom-full left-0 mb-2 w-60 bg-slate-800 text-white text-xs rounded-lg p-2.5 z-20 pointer-events-none">
+                              <p className="font-semibold mb-1">
+                                Valor normalizado
+                              </p>
                               <p className="text-slate-300">
-                                Normalizado pelo limiar da especialidade (50% =
-                                limiar). Bruto:{" "}
+                                50% = limiar desta especialidade.
+                              </p>
+                              <p className="mt-1 text-slate-400">
+                                Limiar:{" "}
+                                <span className="text-white font-medium">
+                                  {riskResult.threshold != null
+                                    ? (
+                                        riskResult.threshold * 100
+                                      ).toLocaleString("pt-BR", {
+                                        minimumFractionDigits: 0,
+                                        maximumFractionDigits: 1,
+                                      }) + "%"
+                                    : "—"}
+                                </span>
+                              </p>
+                              <p className="mt-0.5 text-slate-400">
+                                Bruto:{" "}
                                 <span className="text-white font-medium">
                                   {riskResult.probabilityNoShow.toLocaleString(
                                     "pt-BR",
@@ -1423,7 +1452,7 @@ const Prediction = () => {
                             className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors text-sm"
                           >
                             <Save className="w-4 h-4" />
-                            Salvar Consulta
+                            Salvar consulta
                           </button>
                         ) : (
                           <div className="w-full flex items-center justify-center gap-2 bg-green-50 border border-green-200 text-green-700 font-semibold py-2 px-4 rounded-lg text-sm">
@@ -1437,7 +1466,7 @@ const Prediction = () => {
                     <div className="text-center py-8">
                       <Brain className="w-12 h-12 text-slate-300 mx-auto mb-3" />
                       <p className="text-sm text-slate-500">
-                        Preencha o formulário e clique em "Calcular Risco" para
+                        Preencha o formulário e clique em "Calcular risco" para
                         ver a predição
                       </p>
                     </div>
@@ -1459,7 +1488,7 @@ const Prediction = () => {
                   <div className="border-2 border-dashed border-slate-300 rounded-xl p-12 text-center hover:border-blue-400 transition-colors duration-200">
                     <Upload className="w-16 h-16 text-slate-400 mx-auto mb-4" />
                     <h3 className="text-lg font-semibold text-slate-700 mb-2">
-                      Enviar Arquivo CSV
+                      Enviar arquivo CSV
                     </h3>
                     <p className="text-sm text-slate-500 mb-4">
                       Selecione um arquivo CSV com os dados das consultas
@@ -1475,7 +1504,7 @@ const Prediction = () => {
                       htmlFor="batch-file"
                       className="inline-block bg-white border border-slate-300 text-slate-700 font-medium py-2 px-6 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors"
                     >
-                      Selecionar Arquivo CSV
+                      Selecionar arquivo CSV
                     </label>
                     {batchFile && (
                       <p className="mt-3 text-sm text-green-600">
@@ -1499,7 +1528,7 @@ const Prediction = () => {
                   {/* JSON Input */}
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">
-                      Colar Dados JSON
+                      Colar dados JSON
                     </label>
                     <textarea
                       value={batchJsonInput}
@@ -1545,7 +1574,7 @@ const Prediction = () => {
                     ) : (
                       <>
                         <FileJson className="w-5 h-5" />
-                        Processar Lista em Lote
+                        Processar lista em lote
                       </>
                     )}
                   </button>
@@ -1652,7 +1681,7 @@ const Prediction = () => {
                       }}
                       className="flex items-center gap-2 bg-slate-200 text-slate-700 font-semibold py-3 px-6 rounded-xl hover:bg-slate-300 transition-colors"
                     >
-                      Nova Predição
+                      Nova predição
                     </button>
                     <div className="flex flex-wrap gap-3">
                       <button
@@ -1660,7 +1689,7 @@ const Prediction = () => {
                         className="flex items-center gap-2 bg-green-600 text-white font-semibold py-3 px-6 rounded-xl hover:bg-green-700 transition-colors"
                       >
                         <Download className="w-5 h-5" />
-                        Baixar Resultados (CSV)
+                        Baixar resultados (CSV)
                       </button>
                       <button
                         onClick={handleSaveAll}
@@ -1722,13 +1751,13 @@ const Prediction = () => {
                               Especialidade
                             </th>
                             <th className="px-4 py-3 text-left font-semibold text-slate-700">
-                              Data Consulta
+                              Data consulta
                             </th>
                             <th className="px-4 py-3 text-center font-semibold text-slate-700">
                               Predição
                             </th>
                             <th className="px-4 py-3 text-right font-semibold text-slate-700">
-                              Prob. Falta
+                              Prob. falta
                             </th>
                             <th className="px-4 py-3 text-center font-semibold text-slate-700">
                               Ação
@@ -1786,12 +1815,25 @@ const Prediction = () => {
                                     %
                                   </span>
                                   <Info className="w-3 h-3 text-slate-400 cursor-help flex-shrink-0" />
-                                  <div className="invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-opacity absolute bottom-full right-0 mb-2 w-56 bg-slate-800 text-white text-xs rounded-lg p-2.5 z-20 text-left pointer-events-none">
+                                  <div className="invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-opacity absolute bottom-full right-0 mb-2 w-60 bg-slate-800 text-white text-xs rounded-lg p-2.5 z-20 text-left pointer-events-none">
                                     <p className="font-semibold mb-1">
                                       Valor normalizado
                                     </p>
-                                    <p className="text-slate-300">
-                                      50% = limiar da especialidade. Bruto:{" "}
+                                    <p className="mt-0.5 text-slate-400">
+                                      Limiar:{" "}
+                                      <span className="text-white font-medium">
+                                        {result.threshold != null
+                                          ? (
+                                              result.threshold * 100
+                                            ).toLocaleString("pt-BR", {
+                                              minimumFractionDigits: 0,
+                                              maximumFractionDigits: 1,
+                                            }) + "%"
+                                          : "—"}
+                                      </span>
+                                    </p>
+                                    <p className="mt-0.5 text-slate-400">
+                                      Bruto:{" "}
                                       <span className="text-white font-medium">
                                         {(
                                           result.probability_no_show * 100
@@ -1848,7 +1890,7 @@ const Prediction = () => {
                   <Save className="w-5 h-5 text-blue-600" />
                 </div>
                 <h2 className="text-lg font-bold text-slate-800">
-                  Salvar Consulta
+                  Salvar consulta
                 </h2>
               </div>
               {!saveModal.saving && !saveModal.savedId && (
@@ -1867,7 +1909,7 @@ const Prediction = () => {
                 <div className="text-center py-4">
                   <CheckCircle className="w-14 h-14 text-green-500 mx-auto mb-3" />
                   <p className="text-lg font-bold text-slate-800 mb-1">
-                    Consulta Salva!
+                    Consulta salva!
                   </p>
                   <p className="text-sm text-slate-500">
                     ID:{" "}
