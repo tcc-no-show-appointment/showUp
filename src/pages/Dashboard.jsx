@@ -12,6 +12,7 @@ import {
   ShieldAlert,
   Clock,
   FileDown,
+  Info,
 } from "lucide-react";
 import {
   AreaChart,
@@ -28,7 +29,16 @@ import {
 } from "recharts";
 import { appointmentService } from "../services";
 
-const DAYS_PT = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+const getLast30Days = () => {
+  const days = [];
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    d.setHours(0, 0, 0, 0);
+    days.push(d);
+  }
+  return days;
+};
 
 const isSameDay = (dateStr, target) => {
   const d = new Date(dateStr);
@@ -37,17 +47,6 @@ const isSameDay = (dateStr, target) => {
     d.getMonth() === target.getMonth() &&
     d.getDate() === target.getDate()
   );
-};
-
-const getLast7Days = () => {
-  const days = [];
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    d.setHours(0, 0, 0, 0);
-    days.push(d);
-  }
-  return days;
 };
 
 const Dashboard = () => {
@@ -99,7 +98,7 @@ const Dashboard = () => {
     try {
       const data = await appointmentService.getAppointments({
         page: 1,
-        pageSize: 100,
+        pageSize: 500,
       });
       setAppointments(data.appointments);
       setTotal(data.total);
@@ -128,10 +127,12 @@ const Dashboard = () => {
     (a) => a.created_at && isSameDay(a.created_at, today),
   ).length;
 
-  const withRisk = appointments.filter((a) => a.probability_no_show != null);
+  const withRisk = appointments.filter(
+    (a) => a.probability_no_show_normalized != null,
+  );
   const avgRisk =
     withRisk.length > 0
-      ? withRisk.reduce((sum, a) => sum + a.probability_no_show, 0) /
+      ? withRisk.reduce((sum, a) => sum + a.probability_no_show_normalized, 0) /
         withRisk.length
       : null;
 
@@ -176,7 +177,7 @@ const Dashboard = () => {
   // ── Pending high-risk appointments ──
   const pending = appointments.filter((a) => !a.appointment_status);
   const highRiskPending = pending.filter(
-    (a) => a.probability_no_show > 0.7,
+    (a) => a.probability_no_show_normalized > 0.7,
   ).length;
 
   // ── Specialty breakdown (predicted no-show rate per specialty) ──
@@ -198,13 +199,14 @@ const Dashboard = () => {
     .sort((a, b) => b.rate - a.rate)
     .slice(0, 8);
 
-  const last7Days = getLast7Days();
-  const chartData = last7Days.map((day) => {
+  const last30Days = getLast30Days();
+  const chartData = last30Days.map((day) => {
     const dayAppts = appointments.filter(
       (a) => a.created_at && isSameDay(a.created_at, day),
     );
+    const label = `${String(day.getDate()).padStart(2, "0")}/${String(day.getMonth() + 1).padStart(2, "0")}`;
     return {
-      day: DAYS_PT[day.getDay()],
+      day: label,
       presenca: dayAppts.filter((a) => a.prediction_class === 0).length,
       falta: dayAppts.filter((a) => a.prediction_class === 1).length,
     };
@@ -215,21 +217,21 @@ const Dashboard = () => {
 
   const kpiRow1 = [
     {
-      title: "Predições Hoje",
+      title: "Predições hoje",
       value: loading ? "—" : todayPredictions.toString(),
       icon: Users,
       subtitle: `${total} no total`,
       color: "from-blue-500 to-blue-600",
     },
     {
-      title: "Risco Médio de Falta",
+      title: "Risco médio de falta",
       value: loading ? "—" : fmt(avgRisk != null ? avgRisk * 100 : null),
       icon: TrendingUp,
       subtitle: `${withRisk.length} predições analisadas`,
       color: "from-orange-500 to-orange-600",
     },
     {
-      title: "Taxa de Comparecimento Prevista",
+      title: "Taxa de comparecimento prevista",
       value: loading ? "—" : fmt(attendanceRate),
       icon: CalendarCheck,
       subtitle: `${showCount} de ${withPrediction.length} previstas`,
@@ -239,7 +241,7 @@ const Dashboard = () => {
 
   const kpiRow2 = [
     {
-      title: "Acurácia do Modelo",
+      title: "Acurácia do modelo",
       value: loading
         ? "—"
         : accuracy == null
@@ -254,7 +256,7 @@ const Dashboard = () => {
       color: "from-violet-500 to-violet-600",
     },
     {
-      title: "Precisão em Faltas",
+      title: "Precisão em faltas",
       value: loading ? "—" : fmt(precision),
       icon: ShieldAlert,
       subtitle:
@@ -264,7 +266,7 @@ const Dashboard = () => {
       color: "from-red-500 to-red-600",
     },
     {
-      title: "Alto Risco Pendentes",
+      title: "Alto risco pendentes",
       value: loading ? "—" : highRiskPending.toString(),
       icon: Clock,
       subtitle:
@@ -308,6 +310,34 @@ const Dashboard = () => {
           </button>
         </div>
       </div>
+
+      {/* Data scope banner */}
+      {!loading && !error && (
+        <div className="flex items-center gap-2 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 mb-6 text-sm text-blue-700">
+          <Info className="w-4 h-4 shrink-0" />
+          <span>
+            Todos os cards e gráficos utilizam os{" "}
+            <strong>{appointments.length.toLocaleString("pt-BR")}</strong>{" "}
+            registros mais recentes carregados
+            {total > appointments.length ? (
+              <>
+                {" "}
+                de um total de <strong>
+                  {total.toLocaleString("pt-BR")}
+                </strong>{" "}
+                no banco
+              </>
+            ) : (
+              <>
+                {" "}
+                (total no banco:{" "}
+                <strong>{total.toLocaleString("pt-BR")}</strong>)
+              </>
+            )}
+            . Todo o período de tempo é considerado.
+          </span>
+        </div>
+      )}
 
       {/* Error */}
       {error && (
@@ -398,7 +428,7 @@ const Dashboard = () => {
         <div className="lg:col-span-2 bg-white rounded-xl shadow-sm p-6 border border-slate-200">
           <div className="mb-6">
             <h2 className="text-xl font-bold text-slate-800 mb-1">
-              Predições dos Últimos 7 Dias
+              Predições dos últimos 30 dias
             </h2>
             <p className="text-sm text-slate-500">
               Previsões de presença e falta por dia (consultas salvas)
@@ -434,7 +464,8 @@ const Dashboard = () => {
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                 <XAxis
                   dataKey="day"
-                  tick={{ fill: "#64748b", fontSize: 12 }}
+                  tick={{ fill: "#64748b", fontSize: 10 }}
+                  interval={4}
                   axisLine={{ stroke: "#e2e8f0" }}
                 />
                 <YAxis
@@ -460,7 +491,7 @@ const Dashboard = () => {
                   stroke="#2563eb"
                   strokeWidth={2}
                   fill="url(#colorPresenca)"
-                  name="Presença Prevista"
+                  name="Presença prevista"
                 />
                 <Area
                   type="monotone"
@@ -468,7 +499,7 @@ const Dashboard = () => {
                   stroke="#ef4444"
                   strokeWidth={2}
                   fill="url(#colorFalta)"
-                  name="Falta Prevista"
+                  name="Falta prevista"
                 />
               </AreaChart>
             </ResponsiveContainer>
@@ -478,7 +509,7 @@ const Dashboard = () => {
         {/* Confusion summary — 1/3 width */}
         <div className="bg-white rounded-xl shadow-sm p-6 border border-slate-200">
           <h2 className="text-xl font-bold text-slate-800 mb-1">
-            Desempenho Real
+            Desempenho real
           </h2>
           <p className="text-sm text-slate-500 mb-6">
             Baseado em {withFeedback.length} consulta
@@ -514,7 +545,7 @@ const Dashboard = () => {
               <div className="flex justify-between items-center py-3 border-b border-slate-100">
                 <div>
                   <p className="text-sm font-semibold text-slate-700">
-                    Precisão em Faltas
+                    Precisão em faltas
                   </p>
                   <p className="text-xs text-slate-400">
                     {tp} de {tp + fp} previstas como falta
@@ -540,7 +571,7 @@ const Dashboard = () => {
               <div className="flex justify-between items-center py-3">
                 <div>
                   <p className="text-sm font-semibold text-slate-700">
-                    Taxa Real de Falta
+                    Taxa real de falta
                   </p>
                   <p className="text-xs text-slate-400">
                     {tp + fn} faltas reais confirmadas
@@ -560,7 +591,7 @@ const Dashboard = () => {
         <div className="bg-white rounded-xl shadow-sm p-6 border border-slate-200">
           <div className="mb-6">
             <h2 className="text-xl font-bold text-slate-800 mb-1">
-              Taxa de Falta Prevista por Especialidade
+              Taxa de falta prevista por especialidade
             </h2>
             <p className="text-sm text-slate-500">
               Das consultas salvas, % previstas como falta por especialidade
@@ -596,7 +627,7 @@ const Dashboard = () => {
               <Tooltip
                 formatter={(value, name, props) => [
                   `${value}% (${props.payload.noShow}/${props.payload.total})`,
-                  "Taxa de Falta Prevista",
+                  "Taxa de falta prevista",
                 ]}
                 contentStyle={{
                   backgroundColor: "white",
