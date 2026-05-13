@@ -604,7 +604,8 @@ const Appointments = () => {
                     onClick={() => toggleSort("probability_no_show_normalized")}
                   >
                     <span className="flex items-center gap-1 pr-2">
-                      Risco IA {sortIcon("probability_no_show_normalized")}
+                      Risco previsto{" "}
+                      {sortIcon("probability_no_show_normalized")}
                     </span>
                     <div
                       onMouseDown={startResize(5)}
@@ -699,7 +700,10 @@ const Appointments = () => {
                         </p>
                       </td>
                       <td className="px-4 py-4">
-                        {getRiskBadge(apt.probability_no_show_normalized)}
+                        {getRiskBadge(
+                          apt.probability_no_show_normalized ??
+                            apt.probability_no_show,
+                        )}
                       </td>
                       <td className="px-4 py-4">
                         {getStatusBadge(apt.appointment_status)}

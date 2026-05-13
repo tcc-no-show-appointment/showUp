@@ -34,7 +34,7 @@ import { trainingService } from "../services/trainingService";
 import { modelHistoryService } from "../services/modelHistoryService";
 import { useResizableColumns } from "../hooks/useResizableColumns";
 
-const POLL_INTERVAL_MS = 5000;
+const POLL_INTERVAL_MS = 60000;
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -237,7 +237,7 @@ const JobStatusSection = ({ job }) => {
       {isActive && (
         <div className="flex items-center gap-2 text-blue-600 text-sm bg-blue-50 rounded-lg px-4 py-3">
           <Loader2 className="w-4 h-4 animate-spin shrink-0" />
-          <span>Processando… atualizando a cada 5 segundos</span>
+          <span>Processando… atualizando a cada 1 minuto</span>
         </div>
       )}
 
