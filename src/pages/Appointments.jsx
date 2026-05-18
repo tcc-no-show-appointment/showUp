@@ -249,7 +249,7 @@ const Appointments = () => {
     ).length,
   };
 
-  const getRiskBadge = (probabilityNoShow) => {
+  const getRiskBadge = (probabilityNoShow, threshold) => {
     const risk = getRiskLevel(probabilityNoShow);
     if (!risk) return <span className="text-xs text-slate-400">—</span>;
 
@@ -287,11 +287,18 @@ const Appointments = () => {
             <Info className="w-3 h-3 text-slate-400 cursor-help" />
             <div className="invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-opacity absolute bottom-full left-0 mb-1.5 w-52 bg-slate-800 text-white text-xs rounded-lg p-2.5 z-30 pointer-events-none">
               <p className="font-semibold mb-1">Valor normalizado</p>
+              {threshold != null && (
+                <p className="text-slate-300 mb-1">
+                  Limiar da especialidade:{" "}
+                  <span className="text-white font-medium">
+                    {(threshold * 100).toFixed(1)}%
+                  </span>
+                </p>
+              )}
               <p className="text-slate-300">
                 50% = limiar da especialidade. Permite comparar o risco entre
                 especialidades diferentes.
               </p>
-              <div className="absolute top-full left-3 border-4 border-transparent border-t-slate-800" />
             </div>
           </div>
         )}
@@ -703,6 +710,7 @@ const Appointments = () => {
                         {getRiskBadge(
                           apt.probability_no_show_normalized ??
                             apt.probability_no_show,
+                          apt.threshold,
                         )}
                       </td>
                       <td className="px-4 py-4">
