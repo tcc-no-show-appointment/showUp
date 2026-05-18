@@ -273,12 +273,31 @@ const Appointments = () => {
     const { cls, icon, label } = configs[risk];
     return (
       <div className="flex items-center gap-2">
-        <span
-          className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold border ${cls}`}
-        >
-          {icon}
-          {label}
-        </span>
+        <div className="relative group/badge inline-flex">
+          <span
+            className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold border cursor-help ${cls}`}
+          >
+            {icon}
+            {label}
+          </span>
+          <div className="invisible group-hover/badge:visible opacity-0 group-hover/badge:opacity-100 transition-opacity absolute bottom-full left-0 mb-1.5 w-44 bg-slate-800 text-white text-xs rounded-lg p-2.5 z-30 pointer-events-none">
+            <p className="font-semibold mb-1.5">Risco normalizado</p>
+            <div className="flex flex-col gap-0.5 text-slate-300">
+              <span>
+                <span className="text-green-400 font-medium">Baixo</span> —
+                abaixo de 40%
+              </span>
+              <span>
+                <span className="text-yellow-400 font-medium">Médio</span> —
+                entre 40% e 70%
+              </span>
+              <span>
+                <span className="text-red-400 font-medium">Alto</span> — acima
+                de 70%
+              </span>
+            </div>
+          </div>
+        </div>
         {probabilityNoShow != null && (
           <div className="relative group inline-flex items-center gap-0.5">
             <span className="text-xs text-slate-500">
@@ -286,18 +305,13 @@ const Appointments = () => {
             </span>
             <Info className="w-3 h-3 text-slate-400 cursor-help" />
             <div className="invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-opacity absolute bottom-full left-0 mb-1.5 w-52 bg-slate-800 text-white text-xs rounded-lg p-2.5 z-30 pointer-events-none">
-              <p className="font-semibold mb-1">Valor normalizado</p>
-              {threshold != null && (
-                <p className="text-slate-300 mb-1">
-                  Limiar da especialidade:{" "}
-                  <span className="text-white font-medium">
-                    {(threshold * 100).toFixed(1)}%
-                  </span>
-                </p>
-              )}
+              <p className="font-semibold mb-1">Risco normalizado</p>
               <p className="text-slate-300">
-                50% = limiar da especialidade. Permite comparar o risco entre
-                especialidades diferentes.
+                Probabilidade ajustada pelo limiar da especialidade
+                {threshold != null ? (
+                  <> ({(threshold * 100).toFixed(1)}%)</>
+                ) : null}
+                .
               </p>
             </div>
           </div>
