@@ -110,6 +110,7 @@ export interface AppointmentCreate {
   probability_show?: number;
   probability_no_show?: number;
   probability_no_show_normalized?: number;
+  threshold?: number;
 }
 
 export interface AppointmentStatusUpdate {
@@ -137,6 +138,7 @@ export interface AppointmentResponse {
   probability_show: number | null;
   probability_no_show: number | null;
   probability_no_show_normalized: number | null;
+  threshold: number | null;
   created_at: string;
   updated_at: string | null;
 }

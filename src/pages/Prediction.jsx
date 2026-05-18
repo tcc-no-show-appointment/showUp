@@ -767,6 +767,7 @@ const Prediction = () => {
       probability_no_show_normalized: riskResult
         ? riskResult.probabilityNoShowNormalized / 100
         : null,
+      threshold: riskResult?.threshold ?? null,
     };
   };
 
@@ -794,6 +795,7 @@ const Prediction = () => {
       probability_show: result.probability_show,
       probability_no_show: result.probability_no_show,
       probability_no_show_normalized: result.probability_no_show_normalized,
+      threshold: result.threshold ?? null,
     };
   };
 
