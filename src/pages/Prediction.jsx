@@ -16,7 +16,6 @@ import {
   Info,
 } from "lucide-react";
 import NormalizedRiskHelp from "../components/NormalizedRiskHelp";
-import NormalizedRiskHelp from "../components/NormalizedRiskHelp";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import "../styles/datepicker-custom.css";
