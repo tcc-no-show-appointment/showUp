@@ -15,6 +15,7 @@ import {
   X,
   Info,
 } from "lucide-react";
+import NormalizedRiskHelp from "../components/NormalizedRiskHelp";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import "../styles/datepicker-custom.css";
@@ -802,13 +803,16 @@ const Prediction = () => {
   return (
     <div className="p-8">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-800 mb-2">
-          Predição com IA
-        </h1>
-        <p className="text-slate-500">
-          Calcule o risco de falta usando predições baseadas em IA
-        </p>
+      <div className="mb-8 flex items-start justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-800 mb-2">
+            Predição com IA
+          </h1>
+          <p className="text-slate-500">
+            Calcule o risco de falta usando predições baseadas em IA
+          </p>
+        </div>
+        <NormalizedRiskHelp />
       </div>
 
       {/* Tabs */}
@@ -1299,16 +1303,11 @@ const Prediction = () => {
                             Probabilidade de falta
                           </p>
                           <Info className="w-3.5 h-3.5 text-slate-400 cursor-help flex-shrink-0" />
-                          <div className="invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-opacity absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-slate-800 text-white text-xs rounded-lg p-3 z-20 text-left pointer-events-none">
-                            <p className="font-semibold mb-1">
+                          <div className="invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-opacity absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 bg-slate-800 text-white text-xs rounded-lg p-3 z-20 text-left pointer-events-none">
+                            <p className="font-semibold mb-1.5">
                               Valor normalizado
                             </p>
-                            <p className="text-slate-300">
-                              Ajustado para que 50% sempre represente o limiar
-                              desta especialidade. Facilita a comparação entre
-                              especialidades.
-                            </p>
-                            <p className="mt-1.5 text-slate-400">
+                            <p className="text-slate-400">
                               Limiar da especialidade:{" "}
                               <span className="text-white font-medium">
                                 {riskResult.threshold != null
@@ -1365,15 +1364,12 @@ const Prediction = () => {
                           <div className="relative group inline-flex items-center gap-1">
                             <span className="text-slate-600">Prob. falta:</span>
                             <Info className="w-3 h-3 text-slate-400 cursor-help" />
-                            <div className="invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-opacity absolute bottom-full left-0 mb-2 w-60 bg-slate-800 text-white text-xs rounded-lg p-2.5 z-20 pointer-events-none">
-                              <p className="font-semibold mb-1">
+                            <div className="invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-opacity absolute bottom-full left-0 mb-2 w-56 bg-slate-800 text-white text-xs rounded-lg p-2.5 z-20 pointer-events-none">
+                              <p className="font-semibold mb-1.5">
                                 Valor normalizado
                               </p>
-                              <p className="text-slate-300">
-                                50% = limiar desta especialidade.
-                              </p>
-                              <p className="mt-1 text-slate-400">
-                                Limiar:{" "}
+                              <p className="text-slate-400">
+                                Limiar da especialidade:{" "}
                                 <span className="text-white font-medium">
                                   {riskResult.threshold != null
                                     ? (
@@ -1386,7 +1382,7 @@ const Prediction = () => {
                                 </span>
                               </p>
                               <p className="mt-0.5 text-slate-400">
-                                Bruto:{" "}
+                                Probabilidade bruta:{" "}
                                 <span className="text-white font-medium">
                                   {riskResult.probabilityNoShow.toLocaleString(
                                     "pt-BR",
@@ -1817,12 +1813,12 @@ const Prediction = () => {
                                     %
                                   </span>
                                   <Info className="w-3 h-3 text-slate-400 cursor-help flex-shrink-0" />
-                                  <div className="invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-opacity absolute bottom-full right-0 mb-2 w-60 bg-slate-800 text-white text-xs rounded-lg p-2.5 z-20 text-left pointer-events-none">
-                                    <p className="font-semibold mb-1">
+                                  <div className="invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-opacity absolute bottom-full right-0 mb-2 w-56 bg-slate-800 text-white text-xs rounded-lg p-2.5 z-20 text-left pointer-events-none">
+                                    <p className="font-semibold mb-1.5">
                                       Valor normalizado
                                     </p>
-                                    <p className="mt-0.5 text-slate-400">
-                                      Limiar:{" "}
+                                    <p className="text-slate-400">
+                                      Limiar da especialidade:{" "}
                                       <span className="text-white font-medium">
                                         {result.threshold != null
                                           ? (
@@ -1835,7 +1831,7 @@ const Prediction = () => {
                                       </span>
                                     </p>
                                     <p className="mt-0.5 text-slate-400">
-                                      Bruto:{" "}
+                                      Probabilidade bruta:{" "}
                                       <span className="text-white font-medium">
                                         {(
                                           result.probability_no_show * 100

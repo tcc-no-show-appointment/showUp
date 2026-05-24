@@ -18,6 +18,7 @@ import {
   Info,
 } from "lucide-react";
 import { useResizableColumns } from "../hooks/useResizableColumns";
+import NormalizedRiskHelp from "../components/NormalizedRiskHelp";
 import { appointmentService } from "../services";
 
 const PAGE_SIZE = 20;
@@ -249,7 +250,7 @@ const Appointments = () => {
     ).length,
   };
 
-  const getRiskBadge = (probabilityNoShow, threshold) => {
+  const getRiskBadge = (probabilityNoShow, threshold, probabilityRaw) => {
     const risk = getRiskLevel(probabilityNoShow);
     if (!risk) return <span className="text-xs text-slate-400">—</span>;
 
@@ -304,14 +305,21 @@ const Appointments = () => {
               {(probabilityNoShow * 100).toFixed(1)}%
             </span>
             <Info className="w-3 h-3 text-slate-400 cursor-help" />
-            <div className="invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-opacity absolute bottom-full left-0 mb-1.5 w-52 bg-slate-800 text-white text-xs rounded-lg p-2.5 z-30 pointer-events-none">
-              <p className="font-semibold mb-1">Risco normalizado</p>
-              <p className="text-slate-300">
-                Probabilidade ajustada pelo limiar da especialidade
-                {threshold != null ? (
-                  <> ({(threshold * 100).toFixed(1)}%)</>
-                ) : null}
-                .
+            <div className="invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-opacity absolute bottom-full left-0 mb-1.5 w-56 bg-slate-800 text-white text-xs rounded-lg p-2.5 z-30 pointer-events-none">
+              <p className="font-semibold mb-1.5">Valor normalizado</p>
+              <p className="text-slate-400">
+                Limiar da especialidade:{" "}
+                <span className="text-white font-medium">
+                  {threshold != null ? `${(threshold * 100).toFixed(1)}%` : "—"}
+                </span>
+              </p>
+              <p className="mt-0.5 text-slate-400">
+                Probabilidade bruta:{" "}
+                <span className="text-white font-medium">
+                  {probabilityRaw != null
+                    ? `${(probabilityRaw * 100).toFixed(1)}%`
+                    : "—"}
+                </span>
               </p>
             </div>
           </div>
@@ -363,14 +371,17 @@ const Appointments = () => {
             Gerencie consultas e forneça feedback para melhorar a IA
           </p>
         </div>
-        <button
-          onClick={() => fetchAppointments(page)}
-          disabled={loading}
-          className="flex items-center gap-2 bg-white border border-slate-300 text-slate-600 font-medium py-2 px-4 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50"
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-          Atualizar
-        </button>
+        <div className="flex items-center gap-2">
+          <NormalizedRiskHelp />
+          <button
+            onClick={() => fetchAppointments(page)}
+            disabled={loading}
+            className="flex items-center gap-2 bg-white border border-slate-300 text-slate-600 font-medium py-2 px-4 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+            Atualizar
+          </button>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -725,6 +736,7 @@ const Appointments = () => {
                           apt.probability_no_show_normalized ??
                             apt.probability_no_show,
                           apt.threshold,
+                          apt.probability_no_show,
                         )}
                       </td>
                       <td className="px-4 py-4">
