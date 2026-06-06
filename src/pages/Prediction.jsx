@@ -1984,9 +1984,10 @@ const Prediction = () => {
                             ? "Falta"
                             : "Presença"}{" "}
                           (
-                          {saveModal.data.probability_no_show != null
+                          {saveModal.data.probability_no_show_normalized != null
                             ? (
-                                saveModal.data.probability_no_show * 100
+                                saveModal.data.probability_no_show_normalized *
+                                100
                               ).toFixed(1)
                             : "—"}
                           %)
