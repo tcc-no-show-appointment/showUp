@@ -1,126 +1,107 @@
-# Show-Up - AI No-Show Prediction Platform
+# Show-Up
 
-A modern, responsive SaaS frontend built with React, Tailwind CSS, and Recharts for predicting medical appointment no-shows using AI.
+Aplicação frontend React para visualizar e operar o sistema de predição de não comparecimento em consultas médicas.
 
-## Features
+## Visão geral
 
-- **Dashboard**: Overview with KPI cards and weekly attendance trend chart
-- **Prediction**: Individual and batch prediction capabilities
-  - Individual: Form-based prediction with real-time risk calculation
-  - Batch: CSV upload or JSON input for bulk processing (up to 1,000 appointments)
-- **Appointments**: Interactive table for managing daily appointments with feedback loop
-  - Color-coded risk levels (High/Medium/Low)
-  - Batch selection with floating action bar
-  - Mark appointments as Show or No-Show
+O `showUp` é a interface central do sistema, permitindo que profissionais de saúde acompanhem o risco de absenteísmo dos pacientes e tomem ações preventivas. A aplicação oferece painel de controle com indicadores, predição individual e em lote, gerenciamento de agendamentos com feedback de comparecimento real, e uma área dedicada ao treinamento de novos modelos com upload de dados históricos.
 
-## Batch Prediction Usage
+Ele consome duas APIs:
 
-The batch prediction feature allows you to predict no-show risk for multiple appointments at once.
+- `no-show-predicton-api` — predições de risco e persistência de agendamentos
+- `no-show-training-api` — validação de arquivos, treinamento de modelos e histórico
 
-### Input Methods
+## Funcionalidades principais
 
-#### 1. CSV File Upload
+- **Dashboard** — indicadores de desempenho (KPIs) e gráfico de tendência semanal de comparecimento
+- **Predição individual** — formulário com dados do agendamento e resultado de risco em tempo real
+- **Predição em lote** — upload de CSV ou colagem de JSON (até 250 agendamentos), com tabela de resultados e exportação CSV
+- **Agendamentos** — lista diária com classificação de risco por cor, seleção em massa e registro de feedback (Compareceu / Faltou)
+- **Treinamento** — upload de novo dataset, acompanhamento do job em tempo real e histórico de modelos treinados
 
-Upload a CSV file with the following columns:
+## Uso do batch prediction
 
-- `Marcacao` (ISO datetime): Scheduled date/time
-- `DataHoraConsulta` (ISO datetime): Appointment date/time
-- `Idade` (integer): Patient age (0-120)
-- `Sexo` (string): Patient gender ("M" or "F")
-- `CidadePaciente` (string): Patient city
-- `BairroPaciente` (string): Patient neighborhood
-- `TipoConvenio` (string): Insurance type
-- `UnidadeAtendimento` (string): Healthcare unit name
-- `Especialidade` (string): Medical specialty
-- `idUnicoPaciente` (string, optional): Unique patient ID
+### Campos esperados por registro
 
-Example files provided:
+- `Marcacao` (ISO datetime) — data e hora da marcação
+- `DataHoraConsulta` (ISO datetime) — data e hora da consulta
+- `Idade` — idade do paciente
+- `Sexo` — `M` ou `F`
+- `CidadePaciente`, `BairroPaciente`
+- `TipoConvenio`
+- `UnidadeAtendimento`, `Especialidade`
+- `idUnicoPaciente` (opcional)
 
-- `example_batch_prediction.csv`
-- `example_batch_prediction.json`
+Exemplos disponíveis: `example_batch_prediction.csv` e `example_batch_prediction.json`
 
-#### 2. JSON Input
+### Resultado
 
-Paste JSON array directly in the textarea. Each object must contain the same fields as CSV.
+- Resumo: total processado, predições de show e no-show
+- Tabela detalhada com probabilidades por agendamento
+- Exportação dos resultados em CSV
 
-### Results
+## Integração com APIs
 
-After processing, you'll see:
+As URLs são configuráveis via variáveis de ambiente:
 
-- **Summary cards**: Total appointments, predicted shows, predicted no-shows
-- **Results table**: Detailed predictions for each appointment
-- **Download option**: Export results as CSV file
+```env
+VITE_PREDICTION_API_URL=http://127.0.0.1:8000
+VITE_TRAINING_API_URL=http://127.0.0.1:8000
+```
 
-### Limits
+O arquivo `src/services/api.ts` cria instâncias Axios independentes para cada backend, com interceptors de erro e timeouts configurados.
 
-- Maximum 1,000 appointments per batch
-- All required fields must be present
-- Invalid records will prevent processing with clear error messages
+## Tecnologias principais
 
-## Tech Stack
+| Tecnologia           | Por quê                                                                                                          |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| **React 18 + Vite**  | Build extremamente rápido e HMR ágil para desenvolvimento; React para gerenciamento de estado e componentização  |
+| **TypeScript**       | Tipagem estática nos serviços e models, reduzindo erros de integração com as APIs                                |
+| **Tailwind CSS**     | Utilitários de estilo inline que eliminam overhead de CSS customizado e aceleram a construção de UI              |
+| **Recharts**         | Biblioteca de gráficos baseada em SVG, bem integrada ao ecossistema React                                        |
+| **Axios**            | Cliente HTTP com suporte a interceptors, facilitando tratamento centralizado de erros e configuração de base URL |
+| **React Router DOM** | Roteamento client-side com navegação entre as páginas sem recarregamento                                         |
 
-- **Framework**: React 18 with Vite
-- **Styling**: Tailwind CSS
-- **Icons**: Lucide React
-- **Charts**: Recharts
-- **Routing**: React Router DOM
+## CI/CD
 
-## Getting Started
+Pipeline executado via GitHub Actions em pushes para `homolog` e `prod`:
 
-### Installation
+1. **Build & Deploy** — instala dependências, compila o projeto com Vite e publica automaticamente no Azure Static Web Apps
+2. **Variáveis de ambiente** — `VITE_PREDICTION_API_URL`, `VITE_TRAINING_API_URL` e `VITE_ENVIRONMENT` são injetadas via secrets do repositório durante o build
+
+## Como rodar
 
 ```bash
 npm install
-```
-
-### Development
-
-```bash
 npm run dev
 ```
 
-The application will be available at `http://localhost:3000`
+A aplicação ficará disponível em `http://localhost:5173`.
 
-### Build
+## Estrutura do projeto
 
-```bash
-npm run build
-```
+- `src/App.tsx` — componente principal, definição de rotas
+- `src/main.tsx` — ponto de entrada React
+- `src/pages/`
+  - `Dashboard.jsx` — KPIs e gráfico de tendência semanal
+  - `Prediction.jsx` — predição individual e em lote com exportação
+  - `Appointments.jsx` — lista de agendamentos com filtros e feedback
+  - `Training.jsx` — upload de dados, acompanhamento de job e histórico de modelos
+- `src/components/`
+  - `Layout.tsx` — estrutura de layout com sidebar e área de conteúdo
+  - `Sidebar.tsx` — navegação lateral com links para as páginas
+  - `DateInput.tsx` — campo de data com máscara e validação
+  - `NormalizedRiskHelp.jsx` — tooltip explicativo do score de risco normalizado
+  - `EnvironmentBanner.tsx` — indicador visual de ambiente (dev / homolog / prod)
+- `src/services/`
+  - `api.ts` — instâncias Axios configuradas por backend
+  - `predictionService.ts` — chamadas aos endpoints de predição
+  - `appointmentService.ts` — chamadas aos endpoints de agendamento
+  - `trainingService.ts` — chamadas aos endpoints de treinamento
+  - `modelHistoryService.ts` — consulta ao histórico de modelos
+  - `healthService.ts` — verificação de saúde das APIs
+- `src/constants/predictionOptions.js` — listas de opções para campos do formulário
 
-### Preview Production Build
+## Licença
 
-```bash
-npm run preview
-```
-
-## Project Structure
-
-```
-showUp/
-├── src/
-│   ├── components/
-│   │   ├── Layout.jsx       # Main layout wrapper
-│   │   └── Sidebar.jsx      # Navigation sidebar
-│   ├── pages/
-│   │   ├── Dashboard.jsx    # Dashboard with KPIs and charts
-│   │   ├── Prediction.jsx   # Individual and batch prediction
-│   │   └── Appointments.jsx # Appointments management
-│   ├── App.jsx              # Main app with routing
-│   ├── main.jsx             # React entry point
-│   └── index.css            # Global styles
-├── index.html
-├── package.json
-├── tailwind.config.js       # Tailwind configuration with brand colors
-├── postcss.config.js
-└── vite.config.js
-```
-
-## Brand Identity
-
-- **Primary Colors**: Cyan (#06b6d4) to Blue (#2563eb) gradient
-- **Background**: Slate-50
-- **Style**: Clean HealthTech aesthetic with airy spacing, soft shadows, and rounded corners
-
-## License
-
-Private - All rights reserved
+MIT
